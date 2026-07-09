@@ -21,7 +21,10 @@
     button.good { background:var(--good); color:#fff; border-color:var(--good); }
     button.bad { background:var(--bad); color:#fff; border-color:var(--bad); }
     button.ghost { background:#f8fafc; }
-    button.selected { outline:3px solid rgba(37,99,235,.28); outline-offset:2px; }
+    button:focus-visible { outline:3px solid rgba(37,99,235,.32); outline-offset:2px; }
+    button.good.selected { background:#bbf7d0; color:#14532d; border-color:#16a34a; }
+    button.bad.selected { background:#fecaca; color:#7f1d1d; border-color:#dc2626; }
+    button.selected { box-shadow:inset 0 0 0 2px rgba(255,255,255,.72); }
     button:disabled { opacity:.45; cursor:not-allowed; }
     .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap:10px; }
     .day-btn { padding:14px 10px; font-weight:700; }
@@ -8879,6 +8882,9 @@
         if (active && active.closest('#studyActions') && !active.disabled) {
           e.preventDefault();
           active.click();
+        } else {
+          e.preventDefault();
+          flipCard();
         }
       }
     }
