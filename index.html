@@ -1,0 +1,8793 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>단어 암기 카드</title>
+  <style>
+    :root { --bg:#f6f7fb; --card:#fff; --text:#172033; --muted:#667085; --line:#e4e7ec; --accent:#2563eb; --bad:#dc2626; --good:#16a34a; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { width:min(980px, calc(100% - 32px)); margin:0 auto; padding:32px 0 56px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:24px; }
+    h1 { margin:0; font-size:28px; }
+    p { margin:0; }
+    .muted { color:var(--muted); }
+    .panel { background:var(--card); border:1px solid var(--line); border-radius:22px; padding:22px; box-shadow:0 8px 24px rgba(16,24,40,.06); }
+    .nav { display:flex; gap:10px; flex-wrap:wrap; }
+    button, select { border:1px solid var(--line); background:#fff; color:var(--text); border-radius:12px; padding:11px 14px; font-size:15px; cursor:pointer; }
+    button:hover { border-color:#b7c2d4; }
+    button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    button.good { background:var(--good); color:#fff; border-color:var(--good); }
+    button.bad { background:var(--bad); color:#fff; border-color:var(--bad); }
+    button.ghost { background:#f8fafc; }
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap:10px; }
+    .day-btn { padding:14px 10px; font-weight:700; }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .space { justify-content:space-between; }
+    .card { min-height:310px; display:flex; align-items:center; justify-content:center; text-align:center; border-radius:26px; background:linear-gradient(180deg, #fff, #f9fbff); border:1px solid var(--line); cursor:pointer; padding:30px; margin:22px 0; user-select:none; }
+    .word { font-size:52px; font-weight:800; line-height:1.15; word-break:break-word; }
+    .meaning { margin-top:18px; font-size:28px; color:#334155; line-height:1.4; }
+    .hint { margin-top:18px; color:var(--muted); }
+    .stats { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+    .chip { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:8px 12px; color:#334155; }
+    .list { display:grid; gap:10px; margin-top:16px; }
+    .item { display:flex; justify-content:space-between; gap:16px; align-items:center; padding:14px; border:1px solid var(--line); border-radius:14px; background:#fff; }
+    .eng { font-weight:800; }
+    .hidden { display:none !important; }
+    @media (max-width:620px) { .word { font-size:38px; } .meaning { font-size:22px; } header { align-items:flex-start; flex-direction:column; } .item { align-items:flex-start; flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>단어 암기 카드</h1>
+        <p class="muted">Day를 고르고, 카드를 눌러 뜻을 확인한 뒤 알았다/몰랐다를 선택하면 된다.</p>
+      </div>
+      <div class="nav">
+        <button id="homeBtn">Day 선택</button>
+        <button id="reviewBtn">나중에 볼 단어 <span id="reviewCount">0</span></button>
+      </div>
+    </header>
+
+    <section id="home" class="panel">
+      <div class="row space">
+        <div>
+          <h2>오늘 외울 Day 선택</h2>
+          <p class="muted">총 <b id="totalWords"></b>개 단어 / <b id="totalDays"></b>일치</p>
+        </div>
+        <button class="ghost" id="resetAllBtn">나중에 볼 단어 전체 초기화</button>
+      </div>
+      <div id="dayGrid" class="grid" style="margin-top:18px"></div>
+    </section>
+
+    <section id="study" class="panel hidden">
+      <div class="row space">
+        <div>
+          <h2 id="studyTitle">학습</h2>
+          <p class="muted" id="progressText"></p>
+        </div>
+        <button id="backHomeBtn">Day 다시 선택</button>
+      </div>
+      <div class="stats">
+        <span class="chip">알았다: <b id="knownCount">0</b></span>
+        <span class="chip">몰랐다: <b id="unknownCount">0</b></span>
+        <span class="chip">나중에 볼 단어: <b id="laterStat">0</b></span>
+      </div>
+      <div id="card" class="card">
+        <div>
+          <div id="word" class="word"></div>
+          <div id="meaning" class="meaning hidden"></div>
+          <div id="hint" class="hint">카드를 누르면 뜻이 나온다</div>
+        </div>
+      </div>
+      <div class="row space">
+        <div class="row">
+          <button class="good" id="knownBtn" disabled>알았다</button>
+          <button class="bad" id="unknownBtn" disabled>몰랐다</button>
+        </div>
+        <button id="nextBtn" disabled>다음 단어</button>
+      </div>
+    </section>
+
+    <section id="review" class="panel hidden">
+      <div class="row space">
+        <div>
+          <h2>나중에 볼 단어</h2>
+          <p class="muted">몰랐던 단어만 모아서 다시 볼 수 있다. 필요 없으면 목록에서 해제하면 된다.</p>
+        </div>
+        <button class="primary" id="studyReviewBtn">이 단어들만 학습</button>
+      </div>
+      <div id="reviewList" class="list"></div>
+    </section>
+  </div>
+
+  <script>
+    const WORDS = [
+  {
+    "id": "day1-1",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "resume",
+    "meaning": "이력서"
+  },
+  {
+    "id": "day1-2",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "applicant",
+    "meaning": "지원자, 신청자"
+  },
+  {
+    "id": "day1-3",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "requirement",
+    "meaning": "필요조건, 요건"
+  },
+  {
+    "id": "day1-4",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "meet",
+    "meaning": "(필요,요구 등을)만족시키다"
+  },
+  {
+    "id": "day1-5",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "qualified",
+    "meaning": "자격있는, 적격의"
+  },
+  {
+    "id": "day1-6",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "candidate",
+    "meaning": "후보자, 지원자"
+  },
+  {
+    "id": "day1-7",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "confidence",
+    "meaning": "확신, 자신, 신임"
+  },
+  {
+    "id": "day1-8",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "highly",
+    "meaning": "매우, 대단히"
+  },
+  {
+    "id": "day1-9",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "professional",
+    "meaning": "전문적인, 직업의, 전문가"
+  },
+  {
+    "id": "day1-10",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "interview",
+    "meaning": "면접, 면접을 보다"
+  },
+  {
+    "id": "day1-11",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "hire",
+    "meaning": "고용하다"
+  },
+  {
+    "id": "day1-12",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "training",
+    "meaning": "교육, 훈련"
+  },
+  {
+    "id": "day1-13",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "reference",
+    "meaning": "추천서, 참고"
+  },
+  {
+    "id": "day1-14",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "position",
+    "meaning": "일자리, 직책, 두다"
+  },
+  {
+    "id": "day1-15",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "achievement",
+    "meaning": "성취, 달성"
+  },
+  {
+    "id": "day1-16",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "impressed",
+    "meaning": "인상 깊게 생각하는, 감명을 받은"
+  },
+  {
+    "id": "day1-17",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "excellent",
+    "meaning": "훌륭한"
+  },
+  {
+    "id": "day1-18",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "eligible",
+    "meaning": "자격이 있는, 적격의"
+  },
+  {
+    "id": "day1-19",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "identify",
+    "meaning": "알아보다, 확인하다"
+  },
+  {
+    "id": "day1-20",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "associate",
+    "meaning": "관련시키다"
+  },
+  {
+    "id": "day1-21",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "condition",
+    "meaning": "조건"
+  },
+  {
+    "id": "day1-22",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "employment",
+    "meaning": "고용"
+  },
+  {
+    "id": "day1-23",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "lack",
+    "meaning": "~이 없다, 부족"
+  },
+  {
+    "id": "day1-24",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "managerial",
+    "meaning": "관리의"
+  },
+  {
+    "id": "day1-25",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "diligent",
+    "meaning": "성실한"
+  },
+  {
+    "id": "day1-26",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "familiar",
+    "meaning": "익숙한, 친숙한"
+  },
+  {
+    "id": "day1-27",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "proficiency",
+    "meaning": "숙달, 능숙"
+  },
+  {
+    "id": "day1-28",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "prospective",
+    "meaning": "장래의, 미래의"
+  },
+  {
+    "id": "day1-29",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "appeal",
+    "meaning": "관심을 끌다, 매력적이다"
+  },
+  {
+    "id": "day1-30",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "specialize",
+    "meaning": "~을 전공하다, 전문적으로 다루다"
+  },
+  {
+    "id": "day1-31",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "apprehensive",
+    "meaning": "걱정하는, 염려하는"
+  },
+  {
+    "id": "day1-32",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "consultant",
+    "meaning": "고문, 컨설턴트"
+  },
+  {
+    "id": "day1-33",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "entitle",
+    "meaning": "자격을 주다"
+  },
+  {
+    "id": "day1-34",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "degree",
+    "meaning": "학위"
+  },
+  {
+    "id": "day1-35",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "payroll",
+    "meaning": "임금대장, 금료명부"
+  },
+  {
+    "id": "day1-36",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "recruit",
+    "meaning": "(신입사원등을)모집하다"
+  },
+  {
+    "id": "day1-37",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "certification",
+    "meaning": "증명서, 증명"
+  },
+  {
+    "id": "day1-38",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "occupation",
+    "meaning": "직업"
+  },
+  {
+    "id": "day1-39",
+    "day": "day1",
+    "dayNumber": 1,
+    "english": "wage",
+    "meaning": "임금, 급료"
+  },
+  {
+    "id": "day2-40",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "attire",
+    "meaning": "복장, 옷차림새"
+  },
+  {
+    "id": "day2-41",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "code",
+    "meaning": "규범, 관례;암호"
+  },
+  {
+    "id": "day2-42",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "concern",
+    "meaning": "우려, 걱정, 문제, 일, ~을 걱정스럽게 하다; 영향을 미치다, 관련되다."
+  },
+  {
+    "id": "day2-43",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "policy",
+    "meaning": "규정; 보험, 증권"
+  },
+  {
+    "id": "day2-44",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "comply",
+    "meaning": "준수하다, 따르다"
+  },
+  {
+    "id": "day2-45",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "regulation",
+    "meaning": "규정"
+  },
+  {
+    "id": "day2-46",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "exception",
+    "meaning": "예외"
+  },
+  {
+    "id": "day2-47",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "adhere",
+    "meaning": "지키다, 고수하다"
+  },
+  {
+    "id": "day2-48",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "severely",
+    "meaning": "엄격하게, 심하게"
+  },
+  {
+    "id": "day2-49",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "refrain",
+    "meaning": "자제하다, 삼가다"
+  },
+  {
+    "id": "day2-50",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "permission",
+    "meaning": "허락, 허가"
+  },
+  {
+    "id": "day2-51",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "access",
+    "meaning": "이용권한, 접근;통로, ~에 접근하다, 도달하다"
+  },
+  {
+    "id": "day2-52",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "thoroughly",
+    "meaning": "철저하게, 완전히, 대단히"
+  },
+  {
+    "id": "day2-53",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "revise",
+    "meaning": "(의견, 계획을)수정하다, 변경하다"
+  },
+  {
+    "id": "day2-54",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "approach",
+    "meaning": "접근법, 처리방법"
+  },
+  {
+    "id": "day2-55",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "approval",
+    "meaning": "승인, 인가"
+  },
+  {
+    "id": "day2-56",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "form",
+    "meaning": "종류, 유형, 양식"
+  },
+  {
+    "id": "day2-57",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "immediately",
+    "meaning": "즉시, 곧"
+  },
+  {
+    "id": "day2-58",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "inspection",
+    "meaning": "점검, 검사"
+  },
+  {
+    "id": "day2-59",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "arrangement",
+    "meaning": "준비, 마련, 주선"
+  },
+  {
+    "id": "day2-60",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "procedure",
+    "meaning": "절차"
+  },
+  {
+    "id": "day2-61",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "negative",
+    "meaning": "부정적인, 비관적인"
+  },
+  {
+    "id": "day2-62",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "mandate",
+    "meaning": "명령하다, 지시하다, 권한, 지시, 명령"
+  },
+  {
+    "id": "day2-63",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "effect",
+    "meaning": "(법률등의)효력, 효과, 영향, 결과로서 ~을 가져오다"
+  },
+  {
+    "id": "day2-64",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "drastically",
+    "meaning": "심하게, 과감하게, 철저하게"
+  },
+  {
+    "id": "day2-65",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "according to",
+    "meaning": "~에 따라"
+  },
+  {
+    "id": "day2-66",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "enable",
+    "meaning": "(무엇을)가능하게 하다"
+  },
+  {
+    "id": "day2-67",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "standard",
+    "meaning": "기준, 표준"
+  },
+  {
+    "id": "day2-68",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "constant",
+    "meaning": "지속적인, 끊임없이 계속하는"
+  },
+  {
+    "id": "day2-69",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "act",
+    "meaning": "법령, 결의서; 행위, 행동, 결정하다, 판결을 내리다, 행동하다"
+  },
+  {
+    "id": "day2-70",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "compensation",
+    "meaning": "보상금, 보상"
+  },
+  {
+    "id": "day2-71",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "ban",
+    "meaning": "금지, 금지하다"
+  },
+  {
+    "id": "day2-72",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "obligation",
+    "meaning": "의무, 책임"
+  },
+  {
+    "id": "day2-73",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "authorize",
+    "meaning": "~을 인가하다, 권한을 부여하다."
+  },
+  {
+    "id": "day2-74",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "prohibit",
+    "meaning": "금지하다"
+  },
+  {
+    "id": "day2-75",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "abolish",
+    "meaning": "(제도, 법률등을)폐지하다"
+  },
+  {
+    "id": "day2-76",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "enforce",
+    "meaning": "(법률을)시행하다, 집행하다"
+  },
+  {
+    "id": "day2-77",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "habit",
+    "meaning": "습관, 버릇"
+  },
+  {
+    "id": "day2-78",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "lagislation",
+    "meaning": "법률, 법규"
+  },
+  {
+    "id": "day2-79",
+    "day": "day2",
+    "dayNumber": 2,
+    "english": "restrict",
+    "meaning": "한정하다, 제한하다"
+  },
+  {
+    "id": "day3-80",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "accustomed",
+    "meaning": "익숙한"
+  },
+  {
+    "id": "day3-81",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "corporatiion",
+    "meaning": "주식회사, 법인"
+  },
+  {
+    "id": "day3-82",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "demanding",
+    "meaning": "요구가 많은, 힘든"
+  },
+  {
+    "id": "day3-83",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "colleague",
+    "meaning": "동료"
+  },
+  {
+    "id": "day3-84",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "division",
+    "meaning": "부서"
+  },
+  {
+    "id": "day3-85",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "request",
+    "meaning": "요청, 요청하다"
+  },
+  {
+    "id": "day3-86",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "efficiently",
+    "meaning": "효율적으로"
+  },
+  {
+    "id": "day3-87",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "manage",
+    "meaning": "~을 경영하다; 가까스로 하다"
+  },
+  {
+    "id": "day3-88",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "submit",
+    "meaning": "제출하다"
+  },
+  {
+    "id": "day3-89",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "directly",
+    "meaning": "곧바로"
+  },
+  {
+    "id": "day3-90",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "remind",
+    "meaning": "~에게 상기시키다, 일깨우다"
+  },
+  {
+    "id": "day3-91",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "instruct",
+    "meaning": "지시하다, 가르치다"
+  },
+  {
+    "id": "day3-92",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "deadline",
+    "meaning": "마감일, 마감 시간"
+  },
+  {
+    "id": "day3-93",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "sample",
+    "meaning": "견본, 샘플, 표본\n시식하다, (견본으로 질을)시험하다"
+  },
+  {
+    "id": "day3-94",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "notify",
+    "meaning": "~에게 통지하다, 알리다"
+  },
+  {
+    "id": "day3-95",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "perform",
+    "meaning": "행하다, 실행하다"
+  },
+  {
+    "id": "day3-96",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "monitor",
+    "meaning": "감독하다, 감시하다, 실행하다"
+  },
+  {
+    "id": "day3-97",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "deserve",
+    "meaning": "~할 만하다, ~할 가치가 있다"
+  },
+  {
+    "id": "day3-98",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "assignment",
+    "meaning": "일, 임무, 과제"
+  },
+  {
+    "id": "day3-99",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "entire",
+    "meaning": "전체의"
+  },
+  {
+    "id": "day3-100",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "release",
+    "meaning": "발표하다, 공개하다, 출시, 발매"
+  },
+  {
+    "id": "day3-101",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "extension",
+    "meaning": "연장, 연기; (전화의)내선"
+  },
+  {
+    "id": "day3-102",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "electronically",
+    "meaning": "컴퓨터 통신망으로, 컴퓨터로"
+  },
+  {
+    "id": "day3-103",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "attendance",
+    "meaning": "출석, 출근"
+  },
+  {
+    "id": "day3-104",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "absolutely",
+    "meaning": "절대적으로, 완전히"
+  },
+  {
+    "id": "day3-105",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "delegate",
+    "meaning": "(권한등을)위임하다. 대표"
+  },
+  {
+    "id": "day3-106",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "attentively",
+    "meaning": "주의 깊게, 조심스럽게"
+  },
+  {
+    "id": "day3-107",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "supervision",
+    "meaning": "감독"
+  },
+  {
+    "id": "day3-108",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "workshop",
+    "meaning": "워크숍, 연수"
+  },
+  {
+    "id": "day3-109",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "draw",
+    "meaning": "끌다, 끌어당기다"
+  },
+  {
+    "id": "day3-110",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "revision",
+    "meaning": "수정, 개정"
+  },
+  {
+    "id": "day3-111",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "reluctantly",
+    "meaning": "마지못해, 꺼려하여"
+  },
+  {
+    "id": "day3-112",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "acquaint",
+    "meaning": "~에게 숙지시키다, 잘 알게 하다"
+  },
+  {
+    "id": "day3-113",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "convey",
+    "meaning": "(용건을)전달하다"
+  },
+  {
+    "id": "day3-114",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "check",
+    "meaning": "검사하다, 조사하다, 확인하다"
+  },
+  {
+    "id": "day3-115",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "headquarters",
+    "meaning": "본부"
+  },
+  {
+    "id": "day3-116",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "file",
+    "meaning": "(서류를)정리하다, 철하다;\n(서류, 신청, 고소 등을)정식으로 제기하다, 제출하다"
+  },
+  {
+    "id": "day3-117",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "oversee",
+    "meaning": "감독하다 (foresee예견하다, oversea해외의)"
+  },
+  {
+    "id": "day3-118",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "involved",
+    "meaning": "관여하는, 관계된, 연루된"
+  },
+  {
+    "id": "day3-119",
+    "day": "day3",
+    "dayNumber": 3,
+    "english": "concentrate",
+    "meaning": "집중하다, 집중시키다"
+  },
+  {
+    "id": "day4-120",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "lax",
+    "meaning": "(행동 등이)느슨한, 규율에 못 미치는"
+  },
+  {
+    "id": "day4-121",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "procrastinate",
+    "meaning": "미루다, 꾸물거리다"
+  },
+  {
+    "id": "day4-122",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "combined",
+    "meaning": "결합된, 합동의"
+  },
+  {
+    "id": "day4-123",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "accomplish",
+    "meaning": "성취하다"
+  },
+  {
+    "id": "day4-124",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "voluntarily",
+    "meaning": "자발적으로"
+  },
+  {
+    "id": "day4-125",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "undertake",
+    "meaning": "(일을)떠맡다"
+  },
+  {
+    "id": "day4-126",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "assume",
+    "meaning": "(증거는 없으나)사실이라고 생각하다;\n(책임,역할을)맡다"
+  },
+  {
+    "id": "day4-127",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "occasionally",
+    "meaning": "가끔, 때때로"
+  },
+  {
+    "id": "day4-128",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "employee",
+    "meaning": "직원, 고용인"
+  },
+  {
+    "id": "day4-129",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "assist",
+    "meaning": "돕다, 조력하다"
+  },
+  {
+    "id": "day4-130",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "satisfied",
+    "meaning": "만족하는, 만족스러워하는"
+  },
+  {
+    "id": "day4-131",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "manner",
+    "meaning": "방식, 태도"
+  },
+  {
+    "id": "day4-132",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "responsible",
+    "meaning": "책임이 있는, 책임져야 할"
+  },
+  {
+    "id": "day4-133",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "conduct",
+    "meaning": "(업무 등을)수행하다"
+  },
+  {
+    "id": "day4-134",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "adjust",
+    "meaning": "적응하다"
+  },
+  {
+    "id": "day4-135",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "personnel",
+    "meaning": "(집합적)직원, 인원; 인사과"
+  },
+  {
+    "id": "day4-136",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "agree",
+    "meaning": "동의하다"
+  },
+  {
+    "id": "day4-137",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "supervise",
+    "meaning": "감독하다, 지도하다"
+  },
+  {
+    "id": "day4-138",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "coworker",
+    "meaning": "동료, 협력자"
+  },
+  {
+    "id": "day4-139",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "direct",
+    "meaning": "~에게 길을 안내하다, 가르쳐 주다"
+  },
+  {
+    "id": "day4-140",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "confidential",
+    "meaning": "기밀의, 내밀한"
+  },
+  {
+    "id": "day4-141",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "assign",
+    "meaning": "배정하다, 할당하다"
+  },
+  {
+    "id": "day4-142",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "leading",
+    "meaning": "선도적인, 일류의, 가장 중요한, 선두적인"
+  },
+  {
+    "id": "day4-143",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "formal",
+    "meaning": "격식을 갖춘"
+  },
+  {
+    "id": "day4-144",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "remove",
+    "meaning": "해임하다, 제거하다"
+  },
+  {
+    "id": "day4-145",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "collect",
+    "meaning": "모으다"
+  },
+  {
+    "id": "day4-146",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "coordinate",
+    "meaning": "조정하다"
+  },
+  {
+    "id": "day4-147",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "hardly",
+    "meaning": "거의~하지않다"
+  },
+  {
+    "id": "day4-148",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "abstract",
+    "meaning": "추상적인, 막연한"
+  },
+  {
+    "id": "day4-149",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "directory",
+    "meaning": "주소록"
+  },
+  {
+    "id": "day4-150",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "accountable",
+    "meaning": "책임이 있는"
+  },
+  {
+    "id": "day4-151",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "skillfully",
+    "meaning": "능숙하게, 솜씨있게"
+  },
+  {
+    "id": "day4-152",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "exclusive",
+    "meaning": "독점적인, 배타적인"
+  },
+  {
+    "id": "day4-153",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "intention",
+    "meaning": "의지, 의향"
+  },
+  {
+    "id": "day4-154",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "transform",
+    "meaning": "바꾸다, 변모시키다"
+  },
+  {
+    "id": "day4-155",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "respectful",
+    "meaning": "정중한, 존중하는"
+  },
+  {
+    "id": "day4-156",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "duplicate",
+    "meaning": "사본"
+  },
+  {
+    "id": "day4-157",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "contrary",
+    "meaning": "반대"
+  },
+  {
+    "id": "day4-158",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "disturbing",
+    "meaning": "충격적인, 불안감을 주는, 방해하는"
+  },
+  {
+    "id": "day4-159",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "engage",
+    "meaning": "관여하다, 종사하다"
+  },
+  {
+    "id": "day4-160",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "foster",
+    "meaning": "촉진하다, 육성하다"
+  },
+  {
+    "id": "day4-161",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "neutrality",
+    "meaning": "중립성, 중립"
+  },
+  {
+    "id": "day4-162",
+    "day": "day4",
+    "dayNumber": 4,
+    "english": "widely",
+    "meaning": "널리"
+  },
+  {
+    "id": "day5-163",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "sophisticated",
+    "meaning": "(기계가)정교한, 복잡한; 세련된"
+  },
+  {
+    "id": "day5-164",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "timely",
+    "meaning": "시기적절한, 때를 맞춘"
+  },
+  {
+    "id": "day5-165",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "realistically",
+    "meaning": "현실적으로"
+  },
+  {
+    "id": "day5-166",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "promptly",
+    "meaning": "즉시; 정각에"
+  },
+  {
+    "id": "day5-167",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "accessible",
+    "meaning": "출입할 수 있는; 이용할 수 있는"
+  },
+  {
+    "id": "day5-168",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "implement",
+    "meaning": "실시하다, 실행하다"
+  },
+  {
+    "id": "day5-169",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "feedback",
+    "meaning": "의견, 반응"
+  },
+  {
+    "id": "day5-170",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "outstanding",
+    "meaning": "우수한; (부채 등이)미지불된"
+  },
+  {
+    "id": "day5-171",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "inform",
+    "meaning": "~에게 알리다"
+  },
+  {
+    "id": "day5-172",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "replacement",
+    "meaning": "교체, 후임자"
+  },
+  {
+    "id": "day5-173",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "announcement",
+    "meaning": "공고, 발표"
+  },
+  {
+    "id": "day5-174",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "department",
+    "meaning": "(조직, 기구의)부서"
+  },
+  {
+    "id": "day5-175",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "permanently",
+    "meaning": "영구적으로, 불변으로"
+  },
+  {
+    "id": "day5-176",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "fulfill",
+    "meaning": "(조건을)만족시키다, (약속, 의무등을)지키다, 이행하다"
+  },
+  {
+    "id": "day5-177",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "outline",
+    "meaning": "개요, 설명하다, 약술하다"
+  },
+  {
+    "id": "day5-178",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "explain",
+    "meaning": "설명하다"
+  },
+  {
+    "id": "day5-179",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "contain",
+    "meaning": "포함하다"
+  },
+  {
+    "id": "day5-180",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "compile",
+    "meaning": "(자료 등을)편집하다; 모으다"
+  },
+  {
+    "id": "day5-181",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "subsequent",
+    "meaning": "차후의, 그 다음의"
+  },
+  {
+    "id": "day5-182",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "overview",
+    "meaning": "개요, 개관"
+  },
+  {
+    "id": "day5-183",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "provider",
+    "meaning": "공급자, 제공자"
+  },
+  {
+    "id": "day5-184",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "matter",
+    "meaning": "문제, 일"
+  },
+  {
+    "id": "day5-185",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "expertise",
+    "meaning": "전문지식, 전문기술"
+  },
+  {
+    "id": "day5-186",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "demonstrate",
+    "meaning": "증명하다; (모형, 실험등으로)설명하다"
+  },
+  {
+    "id": "day5-187",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "remainder",
+    "meaning": "나머지"
+  },
+  {
+    "id": "day5-188",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "essential",
+    "meaning": "필수적인, 극히 중요한, 본질적인"
+  },
+  {
+    "id": "day5-189",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "divide",
+    "meaning": "분배하다, 나누다"
+  },
+  {
+    "id": "day5-190",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "major",
+    "meaning": "주요한, 중대한"
+  },
+  {
+    "id": "day5-191",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "compliance",
+    "meaning": "(명령, 법규에의)준수"
+  },
+  {
+    "id": "day5-192",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "clarify",
+    "meaning": "명확하게 하다"
+  },
+  {
+    "id": "day5-193",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "face",
+    "meaning": "(문제 등에)직면하다; 향하다, 마주보다"
+  },
+  {
+    "id": "day5-194",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "follow",
+    "meaning": "~을 따라가다; 주시하다; (분명히)이해하다"
+  },
+  {
+    "id": "day5-195",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "aspect",
+    "meaning": "관점, 국면"
+  },
+  {
+    "id": "day5-196",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "apparently",
+    "meaning": "보기에 ~한 듯한, 외관상으로는"
+  },
+  {
+    "id": "day5-197",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "aware",
+    "meaning": "알고 있는, 인식하고 있는"
+  },
+  {
+    "id": "day5-198",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "extended",
+    "meaning": "(기간 등을)연장한, 장기간에 걸친"
+  },
+  {
+    "id": "day5-199",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "accidentally",
+    "meaning": "뜻하지 않게, 우연히"
+  },
+  {
+    "id": "day5-200",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "advisable",
+    "meaning": "바람직한, 합당한"
+  },
+  {
+    "id": "day5-201",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "concerned",
+    "meaning": "염려하는, 걱정하는; 관련된"
+  },
+  {
+    "id": "day5-202",
+    "day": "day5",
+    "dayNumber": 5,
+    "english": "speak",
+    "meaning": "이야기 하다"
+  },
+  {
+    "id": "day6-203",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "collection",
+    "meaning": "소장품, 수집물; 징수, 수금"
+  },
+  {
+    "id": "day6-204",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "exhibition",
+    "meaning": "전시회"
+  },
+  {
+    "id": "day6-205",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "celebrity",
+    "meaning": "유명인사, 명사"
+  },
+  {
+    "id": "day6-206",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "live",
+    "meaning": "(라디오, TV가)생방송인"
+  },
+  {
+    "id": "day6-207",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "improvise",
+    "meaning": "(연주, 연설 등을)즉흥적으로 하다, 즉석에서 만들다."
+  },
+  {
+    "id": "day6-208",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "popular",
+    "meaning": "인기있는"
+  },
+  {
+    "id": "day6-209",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "donation",
+    "meaning": "기증, 기부"
+  },
+  {
+    "id": "day6-210",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "alumni",
+    "meaning": "동창생들, 졸업생들"
+  },
+  {
+    "id": "day6-211",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "present",
+    "meaning": "제시하다, 현재의, 참석한"
+  },
+  {
+    "id": "day6-212",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "admission",
+    "meaning": "입장"
+  },
+  {
+    "id": "day6-213",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "banquet",
+    "meaning": "연회, 만찬"
+  },
+  {
+    "id": "day6-214",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "anniversary",
+    "meaning": "기념일"
+  },
+  {
+    "id": "day6-215",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "required",
+    "meaning": "필수의, 의무적인"
+  },
+  {
+    "id": "day6-216",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "succeed",
+    "meaning": "성공하다, 뒤를 잇다"
+  },
+  {
+    "id": "day6-217",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "rest",
+    "meaning": "쉬다,휴식, 나머지"
+  },
+  {
+    "id": "day6-218",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "fund-raising",
+    "meaning": "모금"
+  },
+  {
+    "id": "day6-219",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "resume",
+    "meaning": "재개하다, 다시 시작하다"
+  },
+  {
+    "id": "day6-220",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "issue",
+    "meaning": "(출판물의)제 ~호; 문제, 쟁점"
+  },
+  {
+    "id": "day6-221",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "subscription",
+    "meaning": "(정기발행물의) 구독"
+  },
+  {
+    "id": "day6-222",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "appear",
+    "meaning": "나타나다, 출현하다"
+  },
+  {
+    "id": "day6-223",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "accompany",
+    "meaning": "동행하다, 동반하다"
+  },
+  {
+    "id": "day6-224",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "edition",
+    "meaning": "(간행물의)판"
+  },
+  {
+    "id": "day6-225",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "specifically",
+    "meaning": "명확하게, 분명히; 특히, 특별히"
+  },
+  {
+    "id": "day6-226",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "anonymous",
+    "meaning": "익명의, 이름을 모르는"
+  },
+  {
+    "id": "day6-227",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "commit",
+    "meaning": "헌신하다, 전념하다"
+  },
+  {
+    "id": "day6-228",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "information",
+    "meaning": "유익한, 정보를 주는"
+  },
+  {
+    "id": "day6-229",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "audience",
+    "meaning": "청중, 관중"
+  },
+  {
+    "id": "day6-230",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "author",
+    "meaning": "작가, 저자"
+  },
+  {
+    "id": "day6-231",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "note",
+    "meaning": "주목하다; 특별히 언급하다."
+  },
+  {
+    "id": "day6-232",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "antique",
+    "meaning": "골동품"
+  },
+  {
+    "id": "day6-233",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "manuscript",
+    "meaning": "원고"
+  },
+  {
+    "id": "day6-234",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "beneficial",
+    "meaning": "유익한, 이로운"
+  },
+  {
+    "id": "day6-235",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "upcoming",
+    "meaning": "곧 있을, 다가오는"
+  },
+  {
+    "id": "day6-236",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "lend",
+    "meaning": "빌려주다"
+  },
+  {
+    "id": "day6-237",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "current",
+    "meaning": "현재의,; 현행의, 통용되는"
+  },
+  {
+    "id": "day6-238",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "local",
+    "meaning": "지방의, 고장의"
+  },
+  {
+    "id": "day6-239",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "variety",
+    "meaning": "다양성, 변화"
+  },
+  {
+    "id": "day6-240",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "advocate",
+    "meaning": "옹호자"
+  },
+  {
+    "id": "day6-241",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "contributor",
+    "meaning": "기고가, 공헌자"
+  },
+  {
+    "id": "day6-242",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "defy",
+    "meaning": "저항하다; (설명,묘사등이)거의 불가능하다"
+  },
+  {
+    "id": "day6-243",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "fascinating",
+    "meaning": "매혹적인, 황홀한"
+  },
+  {
+    "id": "day6-244",
+    "day": "day6",
+    "dayNumber": 6,
+    "english": "showing",
+    "meaning": "(영화, 연극의)상영; 전시"
+  },
+  {
+    "id": "day7-245",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "survey",
+    "meaning": "설문조사"
+  },
+  {
+    "id": "day7-246",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "analysis",
+    "meaning": "분석"
+  },
+  {
+    "id": "day7-247",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "respondent",
+    "meaning": "응답자"
+  },
+  {
+    "id": "day7-248",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "competition",
+    "meaning": "경쟁"
+  },
+  {
+    "id": "day7-249",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "consistently",
+    "meaning": "항상, 일관되게"
+  },
+  {
+    "id": "day7-250",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "demand",
+    "meaning": "수요, 요구하다"
+  },
+  {
+    "id": "day7-251",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "do one's utmost",
+    "meaning": "전력을 다하다"
+  },
+  {
+    "id": "day7-252",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "expand",
+    "meaning": "확장하다, 확대하다"
+  },
+  {
+    "id": "day7-253",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "advanced",
+    "meaning": "고급의; 진보한, 앞선"
+  },
+  {
+    "id": "day7-254",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "postpone",
+    "meaning": "연기하다, 뒤로 미루다"
+  },
+  {
+    "id": "day7-255",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "additional",
+    "meaning": "추가의, 부가적인"
+  },
+  {
+    "id": "day7-256",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "appreciate",
+    "meaning": "고맙게 생각하다; 높이 평가하다; 감상하다"
+  },
+  {
+    "id": "day7-257",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "demonstration",
+    "meaning": "설명; 드러냄, 시연"
+  },
+  {
+    "id": "day7-258",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "buy",
+    "meaning": "사다, 구입하다"
+  },
+  {
+    "id": "day7-259",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "examine",
+    "meaning": "조사하다"
+  },
+  {
+    "id": "day7-260",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "effective",
+    "meaning": "효과적인; (법률 등이)발표되는, 시행되는"
+  },
+  {
+    "id": "day7-261",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "like",
+    "meaning": "좋아하다"
+  },
+  {
+    "id": "day7-262",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "especially",
+    "meaning": "특히"
+  },
+  {
+    "id": "day7-263",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "closely",
+    "meaning": "면밀히, 엄밀히"
+  },
+  {
+    "id": "day7-264",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "reserve",
+    "meaning": "예약하다, 지정하다; 보존하다"
+  },
+  {
+    "id": "day7-265",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "cooperate",
+    "meaning": "협력하다, 협동하다"
+  },
+  {
+    "id": "day7-266",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "very",
+    "meaning": "매우, 대단히, 아주"
+  },
+  {
+    "id": "day7-267",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "consecutive",
+    "meaning": "연속적인"
+  },
+  {
+    "id": "day7-268",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "expectation",
+    "meaning": "예상, 기대"
+  },
+  {
+    "id": "day7-269",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "publicize",
+    "meaning": "공표하다; 광고하다, 선전하다"
+  },
+  {
+    "id": "day7-270",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "raise",
+    "meaning": "높이다, 올리다; (의문을)제기하다"
+  },
+  {
+    "id": "day7-271",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "extremely",
+    "meaning": "극도로, 대단히"
+  },
+  {
+    "id": "day7-272",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "affect",
+    "meaning": "~에 영향을 미치다, 불리하게 작용하다"
+  },
+  {
+    "id": "day7-273",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "target",
+    "meaning": "목표, 목표로 삼다"
+  },
+  {
+    "id": "day7-274",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "campaign",
+    "meaning": "운동, 캠페인"
+  },
+  {
+    "id": "day7-275",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "probable",
+    "meaning": "개연성이 높은, 유망한"
+  },
+  {
+    "id": "day7-276",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "focus",
+    "meaning": "집중시키다, 집중하다"
+  },
+  {
+    "id": "day7-277",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "seasonal",
+    "meaning": "계절의, 계절적인"
+  },
+  {
+    "id": "day7-278",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "impact",
+    "meaning": "영향, 충격"
+  },
+  {
+    "id": "day7-279",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "comparison",
+    "meaning": "비교"
+  },
+  {
+    "id": "day7-280",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "gap",
+    "meaning": "격차"
+  },
+  {
+    "id": "day7-281",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "mounting",
+    "meaning": "증가하는, 오르는"
+  },
+  {
+    "id": "day7-282",
+    "day": "day7",
+    "dayNumber": 7,
+    "english": "reflective",
+    "meaning": "반영하는"
+  },
+  {
+    "id": "day8-283",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "advertisement",
+    "meaning": "광고"
+  },
+  {
+    "id": "day8-284",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "marginal",
+    "meaning": "약간의; 주변의"
+  },
+  {
+    "id": "day8-285",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "customer",
+    "meaning": "고객"
+  },
+  {
+    "id": "day8-286",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "influence",
+    "meaning": "~에 영향을 주다, 영향"
+  },
+  {
+    "id": "day8-287",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "instantly",
+    "meaning": "즉각적으로, 즉시"
+  },
+  {
+    "id": "day8-288",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "creative",
+    "meaning": "창조적인, 독창적인"
+  },
+  {
+    "id": "day8-289",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "aggressively",
+    "meaning": "적극적으로"
+  },
+  {
+    "id": "day8-290",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "aim",
+    "meaning": "~을 겨누다, 목표, 목적"
+  },
+  {
+    "id": "day8-291",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "strategy",
+    "meaning": "전략"
+  },
+  {
+    "id": "day8-292",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "indicate",
+    "meaning": "보여주다, 나타내다"
+  },
+  {
+    "id": "day8-293",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "attract",
+    "meaning": "끌다, 유인하다"
+  },
+  {
+    "id": "day8-294",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "experience",
+    "meaning": "경험, 체험, 체험하다, 경험하다"
+  },
+  {
+    "id": "day8-295",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "analyze",
+    "meaning": "분석하다, 분석적으로 검토하다"
+  },
+  {
+    "id": "day8-296",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "introduce",
+    "meaning": "(신제품을)발표하다, 소개하다"
+  },
+  {
+    "id": "day8-297",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "advise",
+    "meaning": "조언해주다, 충고하다"
+  },
+  {
+    "id": "day8-298",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "subscribe",
+    "meaning": "구독하다"
+  },
+  {
+    "id": "day8-299",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "absence",
+    "meaning": "부재; 결근, 결석"
+  },
+  {
+    "id": "day8-300",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "means",
+    "meaning": "방법, 수단"
+  },
+  {
+    "id": "day8-301",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "prefer",
+    "meaning": "(다른 것보다)~을 더 좋아하다, 선호하다"
+  },
+  {
+    "id": "day8-302",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "advantage",
+    "meaning": "이점, 강점"
+  },
+  {
+    "id": "day8-303",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "forward",
+    "meaning": "앞으로, (물건, 정보를)보내다"
+  },
+  {
+    "id": "day8-304",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "contemporary",
+    "meaning": "동시대의; 현대의, 당대의"
+  },
+  {
+    "id": "day8-305",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "discussion",
+    "meaning": "토론, 토의"
+  },
+  {
+    "id": "day8-306",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "initial",
+    "meaning": "처음의, 최초의"
+  },
+  {
+    "id": "day8-307",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "steadily",
+    "meaning": "착실하게; 꾸준히"
+  },
+  {
+    "id": "day8-308",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "necessarily",
+    "meaning": "반드시"
+  },
+  {
+    "id": "day8-309",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "resolve",
+    "meaning": "(문제 등을)해결하다"
+  },
+  {
+    "id": "day8-310",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "detect",
+    "meaning": "간파하다, 탐지하다"
+  },
+  {
+    "id": "day8-311",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "intensify",
+    "meaning": "강화하다, 증대하다, 강렬하게 만들다."
+  },
+  {
+    "id": "day8-312",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "favorably",
+    "meaning": "호의적으로; 순조롭게"
+  },
+  {
+    "id": "day8-313",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "cover",
+    "meaning": "포함하다; 지불하다; 덮다"
+  },
+  {
+    "id": "day8-314",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "less",
+    "meaning": "보다 적은, 덜한"
+  },
+  {
+    "id": "day8-315",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "majority",
+    "meaning": "대부분, 대다수"
+  },
+  {
+    "id": "day8-316",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "adopt",
+    "meaning": "채택하다"
+  },
+  {
+    "id": "day8-317",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "largely",
+    "meaning": "주로, 대부분"
+  },
+  {
+    "id": "day8-318",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "disregard",
+    "meaning": "소홀히 하다, 무시하다"
+  },
+  {
+    "id": "day8-319",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "effort",
+    "meaning": "노력"
+  },
+  {
+    "id": "day8-320",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "incentive",
+    "meaning": "혜택, 장려금"
+  },
+  {
+    "id": "day8-321",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "need",
+    "meaning": "필요, 요구, 욕구, ~할 필요가 있다."
+  },
+  {
+    "id": "day8-322",
+    "day": "day8",
+    "dayNumber": 8,
+    "english": "mastermind",
+    "meaning": "(계획 등의)입안자, 지도자"
+  },
+  {
+    "id": "day9-323",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "stagnant",
+    "meaning": "침체된, 불경기의, (stagnance침체, 정체, 불황)"
+  },
+  {
+    "id": "day9-324",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "dramatically",
+    "meaning": "극적으로"
+  },
+  {
+    "id": "day9-325",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "brisk",
+    "meaning": "활발한, 호황의"
+  },
+  {
+    "id": "day9-326",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "unstable",
+    "meaning": "불안정한, 변하기 쉬운"
+  },
+  {
+    "id": "day9-327",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "rapidly",
+    "meaning": "급속히, 빨리"
+  },
+  {
+    "id": "day9-328",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "soar",
+    "meaning": "(물가 등이)폭등하다, 높이 치솟다"
+  },
+  {
+    "id": "day9-329",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "assert",
+    "meaning": "단언하다, 주장하다 (assertion 단언, 주장)"
+  },
+  {
+    "id": "day9-330",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "boost",
+    "meaning": "(경기를)부양시키다, 상승시키다"
+  },
+  {
+    "id": "day9-331",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "analyst",
+    "meaning": "분석가"
+  },
+  {
+    "id": "day9-332",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "potential",
+    "meaning": "잠재적인"
+  },
+  {
+    "id": "day9-333",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "pleased",
+    "meaning": "만족해하는, 기쁜"
+  },
+  {
+    "id": "day9-334",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "remain",
+    "meaning": "계속~한 상태이다; 아직 ~해야한다"
+  },
+  {
+    "id": "day9-335",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "limited",
+    "meaning": "제한된, 한정된"
+  },
+  {
+    "id": "day9-336",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "costly",
+    "meaning": "비용이 많이 드는, 손실이 큰"
+  },
+  {
+    "id": "day9-337",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "particular",
+    "meaning": "특정한, 독특한, 세심한 (partocularly 특히)"
+  },
+  {
+    "id": "day9-338",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "drastic",
+    "meaning": "과감한, 급격한"
+  },
+  {
+    "id": "day9-339",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "evenly",
+    "meaning": "고르게, 균등하게"
+  },
+  {
+    "id": "day9-340",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "evidence",
+    "meaning": "증거"
+  },
+  {
+    "id": "day9-341",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "prospect",
+    "meaning": "전망, 예상 (prospective 장래의, 미래의, 기대되는)"
+  },
+  {
+    "id": "day9-342",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "lead",
+    "meaning": "이글다, 지휘하다; (어떤 결과에)이르다"
+  },
+  {
+    "id": "day9-343",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "fall",
+    "meaning": "(값, 가치가)하락하다"
+  },
+  {
+    "id": "day9-344",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "period",
+    "meaning": "기간, 시기"
+  },
+  {
+    "id": "day9-345",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "indicator",
+    "meaning": "지표, 지수"
+  },
+  {
+    "id": "day9-346",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "industry",
+    "meaning": "산업"
+  },
+  {
+    "id": "day9-347",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "likely",
+    "meaning": "~할 것 같은"
+  },
+  {
+    "id": "day9-348",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "boom",
+    "meaning": "붐, 호황"
+  },
+  {
+    "id": "day9-349",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "director",
+    "meaning": "임원, 책임자"
+  },
+  {
+    "id": "day9-350",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "substitute",
+    "meaning": "대용품, 대신하다(substitution 대용, 대체)"
+  },
+  {
+    "id": "day9-351",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "consequence",
+    "meaning": "결과"
+  },
+  {
+    "id": "day9-352",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "fairly",
+    "meaning": "상당히, 꽤"
+  },
+  {
+    "id": "day9-353",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "economical",
+    "meaning": "경제적인, 절약되는"
+  },
+  {
+    "id": "day9-354",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "thrive",
+    "meaning": "번영하다, 성공하다"
+  },
+  {
+    "id": "day9-355",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "implication",
+    "meaning": "영향, 밀접한 관계 (implicate 관련시키다, 관련되었음을 나타내다)"
+  },
+  {
+    "id": "day9-356",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "wane",
+    "meaning": "감소, 감퇴"
+  },
+  {
+    "id": "day9-357",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "prosperity",
+    "meaning": "번영 (prosper 번영하다)"
+  },
+  {
+    "id": "day9-358",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "depression",
+    "meaning": "불황 (depress 하락시키다, 약하게하다)"
+  },
+  {
+    "id": "day9-359",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "dwindle",
+    "meaning": "줄어들다, 감소되다"
+  },
+  {
+    "id": "day9-360",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "impede",
+    "meaning": "저해하다, 방해하다"
+  },
+  {
+    "id": "day9-361",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "promising",
+    "meaning": "유망한, 전망이 좋은"
+  },
+  {
+    "id": "day9-362",
+    "day": "day9",
+    "dayNumber": 9,
+    "english": "adversity",
+    "meaning": "역경, 불운"
+  },
+  {
+    "id": "day10-363",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "purchase",
+    "meaning": "구매하다, 구매"
+  },
+  {
+    "id": "day10-364",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "installment",
+    "meaning": "할부"
+  },
+  {
+    "id": "day10-365",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "affordable",
+    "meaning": "(가격이)알맞은, 감당할 수 있는"
+  },
+  {
+    "id": "day10-366",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "exactly",
+    "meaning": "정확히"
+  },
+  {
+    "id": "day10-367",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "auction",
+    "meaning": "경매"
+  },
+  {
+    "id": "day10-368",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "authentic",
+    "meaning": "진정한, 진짜의, 진품의"
+  },
+  {
+    "id": "day10-369",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "charge",
+    "meaning": "요금,청구,금액;책임,의무\n~을 청구하다; (외상으로)달아놓다"
+  },
+  {
+    "id": "day10-370",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "notice",
+    "meaning": "통지, 공고"
+  },
+  {
+    "id": "day10-371",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "experienced",
+    "meaning": "경험이 있는, 노련한, 능숙한"
+  },
+  {
+    "id": "day10-372",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "instruction",
+    "meaning": "설명, 지시 (instruct 가르치다, 지시하다, instructor교사, 강사)"
+  },
+  {
+    "id": "day10-373",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "expert",
+    "meaning": "전문가, 전문가의, 전문적인"
+  },
+  {
+    "id": "day10-374",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "warranty",
+    "meaning": "(품질 등의)보증, 보증서"
+  },
+  {
+    "id": "day10-375",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "refund",
+    "meaning": "환불, 환불금"
+  },
+  {
+    "id": "day10-376",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "subscriber",
+    "meaning": "가입자, 구독자"
+  },
+  {
+    "id": "day10-377",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "delivery",
+    "meaning": "배달"
+  },
+  {
+    "id": "day10-378",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "price",
+    "meaning": "가격"
+  },
+  {
+    "id": "day10-379",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "receipt",
+    "meaning": "영수증"
+  },
+  {
+    "id": "day10-380",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "offer",
+    "meaning": "제공하다, 제공,오퍼"
+  },
+  {
+    "id": "day10-381",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "carefully",
+    "meaning": "주의깊게, 신중히"
+  },
+  {
+    "id": "day10-382",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "benefit",
+    "meaning": "혜택, 이익, 혜택을 보다, 이익을 얻다"
+  },
+  {
+    "id": "day10-383",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "exclusively",
+    "meaning": "오로지, 독점적으로"
+  },
+  {
+    "id": "day10-384",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "description",
+    "meaning": "(제품등의)설명, 해설"
+  },
+  {
+    "id": "day10-385",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "relatively",
+    "meaning": "상대적으로"
+  },
+  {
+    "id": "day10-386",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "spare",
+    "meaning": "아끼다, 할애하다, 예비의, 여분의"
+  },
+  {
+    "id": "day10-387",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "preparation",
+    "meaning": "준비, 대비"
+  },
+  {
+    "id": "day10-388",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "area",
+    "meaning": "지역, 구역"
+  },
+  {
+    "id": "day10-389",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "clearance",
+    "meaning": "정리, 없애기; 허가"
+  },
+  {
+    "id": "day10-390",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "alter",
+    "meaning": "(성질, 형상을)고치다, 바꾸다"
+  },
+  {
+    "id": "day10-391",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "apply",
+    "meaning": "적용하다; 지원하다"
+  },
+  {
+    "id": "day10-392",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "mutually",
+    "meaning": "서로, 상호 간에 (mutuality 상호관계, 상호의존)"
+  },
+  {
+    "id": "day10-393",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "method",
+    "meaning": "방식, 방법"
+  },
+  {
+    "id": "day10-394",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "acceptable",
+    "meaning": "용인되는, 받아들일 수 있는;\n훌륭한, 만족스러운"
+  },
+  {
+    "id": "day10-395",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "desire",
+    "meaning": "욕구, 갈망, 원하다, 바라다"
+  },
+  {
+    "id": "day10-396",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "redeemable",
+    "meaning": "(현금,상품과)교환할 수 있는, 환급할 수 있는( redeem 상환하다)"
+  },
+  {
+    "id": "day10-397",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "officially",
+    "meaning": "공식적으로"
+  },
+  {
+    "id": "day10-398",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "consumption",
+    "meaning": "소비(량), 소모 (consumptive 소모적인)"
+  },
+  {
+    "id": "day10-399",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "qualify",
+    "meaning": "~의 자격을 얻다"
+  },
+  {
+    "id": "day10-400",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "fabric",
+    "meaning": "섬유, 천"
+  },
+  {
+    "id": "day10-401",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "valid",
+    "meaning": "유효한"
+  },
+  {
+    "id": "day10-402",
+    "day": "day10",
+    "dayNumber": 10,
+    "english": "vendor",
+    "meaning": "노점상, 가판대; 판매업체"
+  },
+  {
+    "id": "day11-403",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "research",
+    "meaning": "연구, 조사"
+  },
+  {
+    "id": "day11-404",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "devise",
+    "meaning": "고안하다, 발명하다"
+  },
+  {
+    "id": "day11-405",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "revolutionary",
+    "meaning": "혁명적인"
+  },
+  {
+    "id": "day11-406",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "innovative",
+    "meaning": "혁신적인"
+  },
+  {
+    "id": "day11-407",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "feature",
+    "meaning": "특징, 특색, 특징으로 삼다, 특별히 포함하다"
+  },
+  {
+    "id": "day11-408",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "inspiration",
+    "meaning": "영감"
+  },
+  {
+    "id": "day11-409",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "sufficiently",
+    "meaning": "충분히(sufficient 충분한, 충분)"
+  },
+  {
+    "id": "day11-410",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "patent",
+    "meaning": "특허, 특허권, 특허품"
+  },
+  {
+    "id": "day11-411",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "envision",
+    "meaning": "(장래의 일 등을)계획하다, 상상하다"
+  },
+  {
+    "id": "day11-412",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "extend",
+    "meaning": "연장하다; (기간을)늘리다;\n(감사의 뜻을)말하다, 베풀다"
+  },
+  {
+    "id": "day11-413",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "following",
+    "meaning": "~후에, 다음의, 다음에 오는"
+  },
+  {
+    "id": "day11-414",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "intend",
+    "meaning": "~할 작정이다; 의도하다"
+  },
+  {
+    "id": "day11-415",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "grant",
+    "meaning": "(인정하여 정식으로)수여하다, 주다,\n(연구비, 장학금등의)보조금"
+  },
+  {
+    "id": "day11-416",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "allow",
+    "meaning": "~하게 하다, ~을 허락하다"
+  },
+  {
+    "id": "day11-417",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "inspect",
+    "meaning": "~을 검사하다, 조사하다"
+  },
+  {
+    "id": "day11-418",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "improve",
+    "meaning": "향상시키다, 개선하다"
+  },
+  {
+    "id": "day11-419",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "increasingly",
+    "meaning": "점점, 더욱 더"
+  },
+  {
+    "id": "day11-420",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "invest",
+    "meaning": "투자하다, 운용하다"
+  },
+  {
+    "id": "day11-421",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "various",
+    "meaning": "여러 가지의, 가지각색의"
+  },
+  {
+    "id": "day11-422",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "upgrade",
+    "meaning": "업그레이드, 개량형\n업그레이드하다, 개선하다"
+  },
+  {
+    "id": "day11-423",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "manual",
+    "meaning": "설명서, 안내서"
+  },
+  {
+    "id": "day11-424",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "explore",
+    "meaning": "조사하다, 탐구하다"
+  },
+  {
+    "id": "day11-425",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "response",
+    "meaning": "응답, 대답"
+  },
+  {
+    "id": "day11-426",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "appearance",
+    "meaning": "외관, 외모"
+  },
+  {
+    "id": "day11-427",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "successful",
+    "meaning": "성공적인, 성공한"
+  },
+  {
+    "id": "day11-428",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "hold",
+    "meaning": "~을 수용하다, ~을 담다;\n(회의 등을)개최하다, 열다"
+  },
+  {
+    "id": "day11-429",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "advance",
+    "meaning": "진보, 전진"
+  },
+  {
+    "id": "day11-430",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "reliable",
+    "meaning": "믿을 만한, 신뢰할 수 있는"
+  },
+  {
+    "id": "day11-431",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "quality",
+    "meaning": "품질, 질"
+  },
+  {
+    "id": "day11-432",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "domestic",
+    "meaning": "국내의, 국산의"
+  },
+  {
+    "id": "day11-433",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "development",
+    "meaning": "개발, 발전"
+  },
+  {
+    "id": "day11-434",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "availability",
+    "meaning": "(입수)가능성, 유효성, 유용성"
+  },
+  {
+    "id": "day11-435",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "update",
+    "meaning": "갱신, 개정, 갱신하다,\n최신의 것으로 하다"
+  },
+  {
+    "id": "day11-436",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "accurate",
+    "meaning": "정확한"
+  },
+  {
+    "id": "day11-437",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "complicate",
+    "meaning": "복잡한(complicatedly복잡하게)"
+  },
+  {
+    "id": "day11-438",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "accomplished",
+    "meaning": "숙련된, 노련한"
+  },
+  {
+    "id": "day11-439",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "inquiry",
+    "meaning": "문의, 질문"
+  },
+  {
+    "id": "day11-440",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "indication",
+    "meaning": "징후, 조짐"
+  },
+  {
+    "id": "day11-441",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "manufacturer",
+    "meaning": "제조회사, 제조업자"
+  },
+  {
+    "id": "day11-442",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "compatible",
+    "meaning": "호환되는, 양립할 수 있는(compatibility 양립성, 호환성)"
+  },
+  {
+    "id": "day11-443",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "superior",
+    "meaning": "우수한, 상급의"
+  },
+  {
+    "id": "day11-444",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "absolute",
+    "meaning": "완전한, 완전무결한"
+  },
+  {
+    "id": "day11-445",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "broaden",
+    "meaning": "넓히다"
+  },
+  {
+    "id": "day11-446",
+    "day": "day11",
+    "dayNumber": 11,
+    "english": "corrosion",
+    "meaning": "부식"
+  },
+  {
+    "id": "day12-447",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "epuipment",
+    "meaning": "장비, 설비"
+  },
+  {
+    "id": "day12-448",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "automate",
+    "meaning": "자동화하다"
+  },
+  {
+    "id": "day12-449",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "specification",
+    "meaning": "명세서, 설명서, 사양"
+  },
+  {
+    "id": "day12-450",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "properly",
+    "meaning": "제대로, 정확하게"
+  },
+  {
+    "id": "day12-451",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "safety",
+    "meaning": "안전"
+  },
+  {
+    "id": "day12-452",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "precaution",
+    "meaning": "예방조치, 예방책"
+  },
+  {
+    "id": "day12-453",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "operate",
+    "meaning": "(기계 등이)작동하다, 움직이다"
+  },
+  {
+    "id": "day12-454",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "processing",
+    "meaning": "가공, 처리(process 과정, 진행, 처리하다)"
+  },
+  {
+    "id": "day12-455",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "capacity",
+    "meaning": "용량, 수용력; 역할"
+  },
+  {
+    "id": "day12-456",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "assemble",
+    "meaning": "(부품,기계 등을)조립하다;\n(사람을)모으다"
+  },
+  {
+    "id": "day12-457",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "utilize",
+    "meaning": "이용하다, 활용하다"
+  },
+  {
+    "id": "day12-458",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "place",
+    "meaning": "~을-한 상태에 두다;\n(지시,주문,신청등을)하다"
+  },
+  {
+    "id": "day12-459",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "fill",
+    "meaning": "~을 채우다; (주문대로)이행하다"
+  },
+  {
+    "id": "day12-460",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "manufacturing",
+    "meaning": "제조(업)의"
+  },
+  {
+    "id": "day12-461",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "renovate",
+    "meaning": "(낡은 건물, 가구등을)개조하다,\n수리하다, 보수하다"
+  },
+  {
+    "id": "day12-462",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "decision",
+    "meaning": "결정, 판단"
+  },
+  {
+    "id": "day12-463",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "material",
+    "meaning": "재료, 물질"
+  },
+  {
+    "id": "day12-464",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "success",
+    "meaning": "성과, 성공"
+  },
+  {
+    "id": "day12-465",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "attribute",
+    "meaning": "(원인을)~의 덕분으로 돌리다"
+  },
+  {
+    "id": "day12-466",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "efficiency",
+    "meaning": "효율, 능률"
+  },
+  {
+    "id": "day12-467",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "limit",
+    "meaning": "한계, 제한"
+  },
+  {
+    "id": "day12-468",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "tailored",
+    "meaning": "맞춤의, 주문에 따라 맞춘"
+  },
+  {
+    "id": "day12-469",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "component",
+    "meaning": "부품, (구성)요소"
+  },
+  {
+    "id": "day12-470",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "capable",
+    "meaning": "~을 할 수 있는, ~할 능력이 있는"
+  },
+  {
+    "id": "day12-471",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "economize",
+    "meaning": "절약하다, 아끼다"
+  },
+  {
+    "id": "day12-472",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "flexible",
+    "meaning": "융통성 있는; 유연한, 잘 구부러지는"
+  },
+  {
+    "id": "day12-473",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "comparable",
+    "meaning": "필적하는, 비교되는"
+  },
+  {
+    "id": "day12-474",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "produce",
+    "meaning": "생산하다"
+  },
+  {
+    "id": "day12-475",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "respectively",
+    "meaning": "각각, 따로(respective 각각의)"
+  },
+  {
+    "id": "day12-476",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "device",
+    "meaning": "장치"
+  },
+  {
+    "id": "day12-477",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "trim",
+    "meaning": "(깍아)다듬다, 없애다; 삭감하다"
+  },
+  {
+    "id": "day12-478",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "launch",
+    "meaning": "(신제품을)출시하다"
+  },
+  {
+    "id": "day12-479",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "separately",
+    "meaning": "개별적으로, 따로따로"
+  },
+  {
+    "id": "day12-480",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "expiration",
+    "meaning": "(기간,임기 등의)만료, 만기"
+  },
+  {
+    "id": "day12-481",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "maneuver",
+    "meaning": "이동시키다, 움직이다"
+  },
+  {
+    "id": "day12-482",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "coming",
+    "meaning": "다가오는"
+  },
+  {
+    "id": "day12-483",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "damaged",
+    "meaning": "손상된, 손해를 입은"
+  },
+  {
+    "id": "day12-484",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "prevent",
+    "meaning": "~을 막다, ~을 예방하다"
+  },
+  {
+    "id": "day12-485",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "power",
+    "meaning": "전력, 전기"
+  },
+  {
+    "id": "day12-486",
+    "day": "day12",
+    "dayNumber": 12,
+    "english": "chemical",
+    "meaning": "화학제품"
+  },
+  {
+    "id": "day13-487",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "complaint",
+    "meaning": "불평"
+  },
+  {
+    "id": "day13-488",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "deal",
+    "meaning": "처리하다; 거래하다; 분배하다"
+  },
+  {
+    "id": "day13-489",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "argumentative",
+    "meaning": "논쟁적인, 논쟁을 좋아하는"
+  },
+  {
+    "id": "day13-490",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "appropriately",
+    "meaning": "적절하게(appropriate 적합한)"
+  },
+  {
+    "id": "day13-491",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "respond",
+    "meaning": "응답하다"
+  },
+  {
+    "id": "day13-492",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "infuriate",
+    "meaning": "화나게하다, 격분시키다"
+  },
+  {
+    "id": "day13-493",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "curteous",
+    "meaning": "예의바른"
+  },
+  {
+    "id": "day13-494",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "satisfaction",
+    "meaning": "만족"
+  },
+  {
+    "id": "day13-495",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "inconvenience",
+    "meaning": "불편, ~에게 불편을 느끼게 하다"
+  },
+  {
+    "id": "day13-496",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "complete",
+    "meaning": "완료하다, 완성하다, 완료된, 완성된"
+  },
+  {
+    "id": "day13-497",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "specific",
+    "meaning": "구체적인, 명확한"
+  },
+  {
+    "id": "day13-498",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "return",
+    "meaning": "반환하다, 반송하다"
+  },
+  {
+    "id": "day13-499",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "replace",
+    "meaning": "~을 교체하다, 대체하다"
+  },
+  {
+    "id": "day13-500",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "presentation",
+    "meaning": "발표"
+  },
+  {
+    "id": "day13-501",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "evaluation",
+    "meaning": "평가"
+  },
+  {
+    "id": "day13-502",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "confident",
+    "meaning": "자신 있는"
+  },
+  {
+    "id": "day13-503",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "cause",
+    "meaning": "~을 야기하다, ~의 원인이 되다\n원인"
+  },
+  {
+    "id": "day13-504",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "commentary",
+    "meaning": "해설, 설명(comment 해설하다,논평, 주석을달다)"
+  },
+  {
+    "id": "day13-505",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "notification",
+    "meaning": "통지"
+  },
+  {
+    "id": "day13-506",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "apologize",
+    "meaning": "사과하다"
+  },
+  {
+    "id": "day13-507",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "interact",
+    "meaning": "소통하다, 교류하다; 상호작용을 하다"
+  },
+  {
+    "id": "day13-508",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "certain",
+    "meaning": "확신하는, 확실한; 특정한"
+  },
+  {
+    "id": "day13-509",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "commitment",
+    "meaning": "헌신, 전념"
+  },
+  {
+    "id": "day13-510",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "applaud",
+    "meaning": "~에게 박수를 보내다; 칭찬하다"
+  },
+  {
+    "id": "day13-511",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "biography",
+    "meaning": "약력, 전기"
+  },
+  {
+    "id": "day13-512",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "critical",
+    "meaning": "비판적인; 중요한; 위기의"
+  },
+  {
+    "id": "day13-513",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "depend on",
+    "meaning": "~에 달려 있다, ~에게 의존하다"
+  },
+  {
+    "id": "day13-514",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "combine",
+    "meaning": "결합시키다"
+  },
+  {
+    "id": "day13-515",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "priority",
+    "meaning": "우선권, 우선사항"
+  },
+  {
+    "id": "day13-516",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "observe",
+    "meaning": "관찰하다, 주시하다;\n(규칙 등을)준수하다, 지키다"
+  },
+  {
+    "id": "day13-517",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "defective",
+    "meaning": "결함이 있는"
+  },
+  {
+    "id": "day13-518",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "reflect",
+    "meaning": "반영하다, 나타내다"
+  },
+  {
+    "id": "day13-519",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "attitude",
+    "meaning": "태도, 마음가짐"
+  },
+  {
+    "id": "day13-520",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "disappoint",
+    "meaning": "실망시키다"
+  },
+  {
+    "id": "day13-521",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "inquire",
+    "meaning": "문의하다, 질문하다"
+  },
+  {
+    "id": "day13-522",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "insert",
+    "meaning": "삽입하다"
+  },
+  {
+    "id": "day13-523",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "disclose",
+    "meaning": "공개하다, 드러내다"
+  },
+  {
+    "id": "day13-524",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "guarantee",
+    "meaning": "보장하다, 보장"
+  },
+  {
+    "id": "day13-525",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "politely",
+    "meaning": "공손하게, 예의바르게"
+  },
+  {
+    "id": "day13-526",
+    "day": "day13",
+    "dayNumber": 13,
+    "english": "seriously",
+    "meaning": "진지하게"
+  },
+  {
+    "id": "day14-527",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "international",
+    "meaning": "국제적인"
+  },
+  {
+    "id": "day14-528",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "attraction",
+    "meaning": "관광 명소"
+  },
+  {
+    "id": "day14-529",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "itinerary",
+    "meaning": "여행 일정"
+  },
+  {
+    "id": "day14-530",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "exotic",
+    "meaning": "이국적인, 매혹적인"
+  },
+  {
+    "id": "day14-531",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "diverse",
+    "meaning": "다양한"
+  },
+  {
+    "id": "day14-532",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "superb",
+    "meaning": "최고의, 뛰어난"
+  },
+  {
+    "id": "day14-533",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "baggage",
+    "meaning": "수화물"
+  },
+  {
+    "id": "day14-534",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "destination",
+    "meaning": "목적지"
+  },
+  {
+    "id": "day14-535",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "missing",
+    "meaning": "분실된, 없어진"
+  },
+  {
+    "id": "day14-536",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "locate",
+    "meaning": "(~의 위치를)찾아내다;\n~을 위치시키다"
+  },
+  {
+    "id": "day14-537",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "approximately",
+    "meaning": "대략"
+  },
+  {
+    "id": "day14-538",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "duty",
+    "meaning": "관세,세금; 직무,의무"
+  },
+  {
+    "id": "day14-539",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "process",
+    "meaning": "과정, 처리하다"
+  },
+  {
+    "id": "day14-540",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "board",
+    "meaning": "탑승하다, 이사회"
+  },
+  {
+    "id": "day14-541",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "comfortable",
+    "meaning": "편안한"
+  },
+  {
+    "id": "day14-542",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "declare",
+    "meaning": "(세관에서)신고하다"
+  },
+  {
+    "id": "day14-543",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "specify",
+    "meaning": "명시하다 (specification 열거, 명시, 명세서)"
+  },
+  {
+    "id": "day14-544",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "depart",
+    "meaning": "출발하다"
+  },
+  {
+    "id": "day14-545",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "emergency",
+    "meaning": "비상시, 비상 사태"
+  },
+  {
+    "id": "day14-546",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "passenger",
+    "meaning": "승객"
+  },
+  {
+    "id": "day14-547",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "outgoing",
+    "meaning": "(장소를)출발하는, 떠나는;\n(지위를)떠나는"
+  },
+  {
+    "id": "day14-548",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "tighly",
+    "meaning": "단단히, 꽉"
+  },
+  {
+    "id": "day14-549",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "tour",
+    "meaning": "(공장,시설 등의)견학, 짧은 여행"
+  },
+  {
+    "id": "day14-550",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "carrier",
+    "meaning": "항공사, 수송기, 수송 회사"
+  },
+  {
+    "id": "day14-551",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "customarily",
+    "meaning": "관례상, 습관적으로"
+  },
+  {
+    "id": "day14-552",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "confuse",
+    "meaning": "혼란시키다 (refuse 거절하다, 거부하다)"
+  },
+  {
+    "id": "day14-553",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "arrive",
+    "meaning": "도착하다"
+  },
+  {
+    "id": "day14-554",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "brochure",
+    "meaning": "(홍보용)소책자, 브로셔"
+  },
+  {
+    "id": "day14-555",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "involve",
+    "meaning": "수반하다, 포함하다; 참여시키다"
+  },
+  {
+    "id": "day14-556",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "ship",
+    "meaning": "(배나 다른 운송 수단으로)운송하다, 수송하다, 선박, 배"
+  },
+  {
+    "id": "day14-557",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "suitcase",
+    "meaning": "여행가방"
+  },
+  {
+    "id": "day14-558",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "unavailable",
+    "meaning": "이용할 수 없는, 구할 수 없는"
+  },
+  {
+    "id": "day14-559",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "fill out/in",
+    "meaning": "(서류에)기입하다, 적어 넣다"
+  },
+  {
+    "id": "day14-560",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "customs",
+    "meaning": "세관"
+  },
+  {
+    "id": "day14-561",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "away",
+    "meaning": "떨어져서"
+  },
+  {
+    "id": "day14-562",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "dramatic",
+    "meaning": "멋진, 극적인; 급격한"
+  },
+  {
+    "id": "day14-563",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "hospitality",
+    "meaning": "환대, 친절"
+  },
+  {
+    "id": "day14-564",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "indulge",
+    "meaning": "빠지다, 탐닉하다"
+  },
+  {
+    "id": "day14-565",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "proximity",
+    "meaning": "가까움, 근접함"
+  },
+  {
+    "id": "day14-566",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "seating",
+    "meaning": "(집합적)좌석 설비; 좌석 배열"
+  },
+  {
+    "id": "day14-567",
+    "day": "day14",
+    "dayNumber": 14,
+    "english": "unlimited",
+    "meaning": "무제한의"
+  },
+  {
+    "id": "day15-568",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "proposal",
+    "meaning": "제안, 계획"
+  },
+  {
+    "id": "day15-569",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "alliance",
+    "meaning": "동맹, 제휴"
+  },
+  {
+    "id": "day15-570",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "stipulation",
+    "meaning": "계약 조건"
+  },
+  {
+    "id": "day15-571",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "term",
+    "meaning": "조건; 임기, 기한"
+  },
+  {
+    "id": "day15-572",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "compromise",
+    "meaning": "타협, 화해"
+  },
+  {
+    "id": "day15-573",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "negotiation",
+    "meaning": "협상, 교섭"
+  },
+  {
+    "id": "day15-574",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "agreement",
+    "meaning": "계약, 협정; 합의"
+  },
+  {
+    "id": "day15-575",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "deadlock",
+    "meaning": "교착 상태"
+  },
+  {
+    "id": "day15-576",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "review",
+    "meaning": "검토하다, 재조사하다"
+  },
+  {
+    "id": "day15-577",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "contract",
+    "meaning": "계약(서),계약하다, 수축하다"
+  },
+  {
+    "id": "day15-578",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "signature",
+    "meaning": "서명"
+  },
+  {
+    "id": "day15-579",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "originally",
+    "meaning": "원래, 처음에는"
+  },
+  {
+    "id": "day15-580",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "direction",
+    "meaning": "방향, 지시, 감독"
+  },
+  {
+    "id": "day15-581",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "initially",
+    "meaning": "처음에, 초기에"
+  },
+  {
+    "id": "day15-582",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "expire",
+    "meaning": "(계약등이)만료되다"
+  },
+  {
+    "id": "day15-583",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "collaborate",
+    "meaning": "협력하다, 공동으로 일하다"
+  },
+  {
+    "id": "day15-584",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "dedicate",
+    "meaning": "전념하다, 헌신하다, 바치다(indicate 나타내다)"
+  },
+  {
+    "id": "day15-585",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "revised",
+    "meaning": "수정된, 변경된"
+  },
+  {
+    "id": "day15-586",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "imperative",
+    "meaning": "반드시 해야 하는, 필수적인"
+  },
+  {
+    "id": "day15-587",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "cooperatively",
+    "meaning": "협력하여, 협조적으로"
+  },
+  {
+    "id": "day15-588",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "commission",
+    "meaning": "수수료, 커미션; 위원회\n(일 등을)의뢰하다, 주문하다"
+  },
+  {
+    "id": "day15-589",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "omit",
+    "meaning": "빠뜨리다, 생략하다"
+  },
+  {
+    "id": "day15-590",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "conflict",
+    "meaning": "대립, 충돌, 갈등"
+  },
+  {
+    "id": "day15-591",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "renew",
+    "meaning": "(계약 등을)갱신하다"
+  },
+  {
+    "id": "day15-592",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "proficient",
+    "meaning": "능숙한, 능한"
+  },
+  {
+    "id": "day15-593",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "confidentiality",
+    "meaning": "기밀, 비밀"
+  },
+  {
+    "id": "day15-594",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "dispute",
+    "meaning": "분쟁, 논쟁"
+  },
+  {
+    "id": "day15-595",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "objection",
+    "meaning": "반대, 이익"
+  },
+  {
+    "id": "day15-596",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "define",
+    "meaning": "규정하다, 정의하다"
+  },
+  {
+    "id": "day15-597",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "impression",
+    "meaning": "인상"
+  },
+  {
+    "id": "day15-598",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "security",
+    "meaning": "보안, 안전, 보호"
+  },
+  {
+    "id": "day15-599",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "option",
+    "meaning": "선택권"
+  },
+  {
+    "id": "day15-600",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "proceed",
+    "meaning": "(일을)진행하다, 진척되다"
+  },
+  {
+    "id": "day15-601",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "modify",
+    "meaning": "수정하다, 일부 변경하다"
+  },
+  {
+    "id": "day15-602",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "narrow",
+    "meaning": "(범위 등을)좁히다"
+  },
+  {
+    "id": "day15-603",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "bid",
+    "meaning": "입찰"
+  },
+  {
+    "id": "day15-604",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "settle",
+    "meaning": "해결하다, 처리하다"
+  },
+  {
+    "id": "day15-605",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "terminate",
+    "meaning": "끝내다, 종결시키다"
+  },
+  {
+    "id": "day15-606",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "challenging",
+    "meaning": "도전적인, 힘든"
+  },
+  {
+    "id": "day15-607",
+    "day": "day15",
+    "dayNumber": 15,
+    "english": "foundation",
+    "meaning": "토대, 기초"
+  },
+  {
+    "id": "day16-608",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "completely",
+    "meaning": "전적으로, 완전히"
+  },
+  {
+    "id": "day16-609",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "refuse",
+    "meaning": "거절하다"
+  },
+  {
+    "id": "day16-610",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "temporarily",
+    "meaning": "일시적으로\n(temporary 일시적인, 잠정적인, 임시고용인)"
+  },
+  {
+    "id": "day16-611",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "dealer",
+    "meaning": "판매업자, 상인"
+  },
+  {
+    "id": "day16-612",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "bulk",
+    "meaning": "대량의"
+  },
+  {
+    "id": "day16-613",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "inventory",
+    "meaning": "재고품, 재고목록"
+  },
+  {
+    "id": "day16-614",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "short",
+    "meaning": "부족한"
+  },
+  {
+    "id": "day16-615",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "cost",
+    "meaning": "비용"
+  },
+  {
+    "id": "day16-616",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "selection",
+    "meaning": "선택된 것, 정선품"
+  },
+  {
+    "id": "day16-617",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "commercial",
+    "meaning": "상업의, 상업적인, 광고"
+  },
+  {
+    "id": "day16-618",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "order",
+    "meaning": "주문하다, 주문, 주문품"
+  },
+  {
+    "id": "day16-619",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "provide",
+    "meaning": "공급하다, 제공하다"
+  },
+  {
+    "id": "day16-620",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "contact",
+    "meaning": "~와 연락하다,\n(상업적 목적으로)교섭하고 있는 사람"
+  },
+  {
+    "id": "day16-621",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "invoice",
+    "meaning": "송장"
+  },
+  {
+    "id": "day16-622",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "move",
+    "meaning": "옮기다, 움직이다, 조치, 수단;\n이동, 이사"
+  },
+  {
+    "id": "day16-623",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "supply",
+    "meaning": "공급하다, 공급; (-s)비품, 소모품"
+  },
+  {
+    "id": "day16-624",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "discount",
+    "meaning": "할인"
+  },
+  {
+    "id": "day16-625",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "distribute",
+    "meaning": "배포하다, 배급하다"
+  },
+  {
+    "id": "day16-626",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "acquisition",
+    "meaning": "인수; 구입한 것"
+  },
+  {
+    "id": "day16-627",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "assure",
+    "meaning": "~에게 보장하다, ~을 안심시키다, 장담하다"
+  },
+  {
+    "id": "day16-628",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "subject",
+    "meaning": "~의 영향을 받기 쉬운;\n(동의 등을)조건으로 하는,\n~에게(~을) 받게 하다"
+  },
+  {
+    "id": "day16-629",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "seek",
+    "meaning": "구하다, 찾다"
+  },
+  {
+    "id": "day16-630",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "satisfactory",
+    "meaning": "만족스러운"
+  },
+  {
+    "id": "day16-631",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "confirmation",
+    "meaning": "확인, 확증"
+  },
+  {
+    "id": "day16-632",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "unable",
+    "meaning": "~할 수 없는"
+  },
+  {
+    "id": "day16-633",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "payment",
+    "meaning": "지불(금액),납입(금액)"
+  },
+  {
+    "id": "day16-634",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "measure",
+    "meaning": "대책, 조치, 수단\n측정하다"
+  },
+  {
+    "id": "day16-635",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "bargain",
+    "meaning": "특가품, 흥정"
+  },
+  {
+    "id": "day16-636",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "stock",
+    "meaning": "재고; 주식"
+  },
+  {
+    "id": "day16-637",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "affordability",
+    "meaning": "감당할 수 있는 비용"
+  },
+  {
+    "id": "day16-638",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "clientele",
+    "meaning": "(집합적)고객들,\n(변호사,건축가 등의)모든 의뢰인"
+  },
+  {
+    "id": "day16-639",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "acclaim",
+    "meaning": "호평, 찬사"
+  },
+  {
+    "id": "day16-640",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "represent",
+    "meaning": "~을 대표하다"
+  },
+  {
+    "id": "day16-641",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "rating",
+    "meaning": "등급, 평가"
+  },
+  {
+    "id": "day16-642",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "encompass",
+    "meaning": "포함하다, 둘러싸다"
+  },
+  {
+    "id": "day16-643",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "finalize",
+    "meaning": "마무리 짓다, 완결하다"
+  },
+  {
+    "id": "day16-644",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "market",
+    "meaning": "시장"
+  },
+  {
+    "id": "day16-645",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "retail",
+    "meaning": "소매"
+  },
+  {
+    "id": "day16-646",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "commodity",
+    "meaning": "상품, 산물"
+  },
+  {
+    "id": "day16-647",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "quote",
+    "meaning": "견적(액), 견적을 내다"
+  },
+  {
+    "id": "day16-648",
+    "day": "day16",
+    "dayNumber": 16,
+    "english": "consignment",
+    "meaning": "위탁 판매(consign위탁하다)"
+  },
+  {
+    "id": "day17-649",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "fragile",
+    "meaning": "깨지기 쉬운"
+  },
+  {
+    "id": "day17-650",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "perishable",
+    "meaning": "부패하기 쉬운"
+  },
+  {
+    "id": "day17-651",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "deliver",
+    "meaning": "배달하다; (연설을)하다"
+  },
+  {
+    "id": "day17-652",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "ensure",
+    "meaning": "확실하게 하다, 보장하다"
+  },
+  {
+    "id": "day17-653",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "courier",
+    "meaning": "급송 택배, 운반인"
+  },
+  {
+    "id": "day17-654",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "carton",
+    "meaning": "(큰)판지상자"
+  },
+  {
+    "id": "day17-655",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "address",
+    "meaning": "주소,\n(어려운 문제 등을)처리하다,다루다"
+  },
+  {
+    "id": "day17-656",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "shipment",
+    "meaning": "선적, (화물의)발송;\n수송품, 적하물"
+  },
+  {
+    "id": "day17-657",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "particularly",
+    "meaning": "특히"
+  },
+  {
+    "id": "day17-658",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "adequately",
+    "meaning": "적절히"
+  },
+  {
+    "id": "day17-659",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "article",
+    "meaning": "물품, 물건; 기사, 논설"
+  },
+  {
+    "id": "day17-660",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "efficient",
+    "meaning": "(기계, 방법 등이)효과적인,능률적인"
+  },
+  {
+    "id": "day17-661",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "agency",
+    "meaning": "대행 회사, 대리점"
+  },
+  {
+    "id": "day17-662",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "enclose",
+    "meaning": "~을 동봉하다; ~을 둘러싸다, 애워싸다"
+  },
+  {
+    "id": "day17-663",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "careful",
+    "meaning": "조심스러운, 주의 깊은"
+  },
+  {
+    "id": "day17-664",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "pick up",
+    "meaning": "~을 찾다; (사람,물건 등을) 도중에 태우다"
+  },
+  {
+    "id": "day17-665",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "carry",
+    "meaning": "지니다; (물건을)팔다, 가게에 놓다"
+  },
+  {
+    "id": "day17-666",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "attach",
+    "meaning": "붙이다, 접착하다, 첨부하다"
+  },
+  {
+    "id": "day17-667",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "formerly",
+    "meaning": "이전에"
+  },
+  {
+    "id": "day17-668",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "package",
+    "meaning": "소포, 꾸러미"
+  },
+  {
+    "id": "day17-669",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "react",
+    "meaning": "반응하다, 대응하다"
+  },
+  {
+    "id": "day17-670",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "content",
+    "meaning": "내용물"
+  },
+  {
+    "id": "day17-671",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "convenience",
+    "meaning": "편의, 편리"
+  },
+  {
+    "id": "day17-672",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "acknowledge",
+    "meaning": "인정하다; (편지 등의)수령을 알리다, 감사하다"
+  },
+  {
+    "id": "day17-673",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "caution",
+    "meaning": "주의, 조심"
+  },
+  {
+    "id": "day17-674",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "correspondence",
+    "meaning": "편지, 통신문"
+  },
+  {
+    "id": "day17-675",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "separate",
+    "meaning": "분리하다; 분류하다"
+  },
+  {
+    "id": "day17-676",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "remarkable",
+    "meaning": "현저한, 두드러진(markedly 현저하게 눈에 띄게)"
+  },
+  {
+    "id": "day17-677",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "handle",
+    "meaning": "취급하다, 다루다"
+  },
+  {
+    "id": "day17-678",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "warehouse",
+    "meaning": "창고, 저장소"
+  },
+  {
+    "id": "day17-679",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "impose",
+    "meaning": "(세금 등을)부과하다"
+  },
+  {
+    "id": "day17-680",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "storage",
+    "meaning": "보관소, 저장소"
+  },
+  {
+    "id": "day17-681",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "detach",
+    "meaning": "분리하다, 떼다, (attach 붙이다)"
+  },
+  {
+    "id": "day17-682",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "envelope",
+    "meaning": "봉투"
+  },
+  {
+    "id": "day17-683",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "exclusion",
+    "meaning": "제외, 배제"
+  },
+  {
+    "id": "day17-684",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "recipient",
+    "meaning": "수신자"
+  },
+  {
+    "id": "day17-685",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "affix",
+    "meaning": "(우표 등을)붙이다"
+  },
+  {
+    "id": "day17-686",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "incorrect",
+    "meaning": "부정확한"
+  },
+  {
+    "id": "day17-687",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "oblige",
+    "meaning": "어쩔 수 없이 ~하게 하다,\n~에게 강요하다"
+  },
+  {
+    "id": "day17-688",
+    "day": "day17",
+    "dayNumber": 17,
+    "english": "step",
+    "meaning": "단계; 조치, 수단"
+  },
+  {
+    "id": "day18-689",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "check in",
+    "meaning": "체크인하다, 숙박 수속을 하다"
+  },
+  {
+    "id": "day18-690",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "compensate",
+    "meaning": "보상하다\n(compensation 보상)"
+  },
+  {
+    "id": "day18-691",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "complimentary",
+    "meaning": "무료의, 우대의"
+  },
+  {
+    "id": "day18-692",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "chef",
+    "meaning": "주방장"
+  },
+  {
+    "id": "day18-693",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "container",
+    "meaning": "용기, 그릇"
+  },
+  {
+    "id": "day18-694",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "elegant",
+    "meaning": "우아한, 고상한"
+  },
+  {
+    "id": "day18-695",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "flavor",
+    "meaning": "맛, 풍미"
+  },
+  {
+    "id": "day18-696",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "accommodate",
+    "meaning": "(건물 등이)~을 수용하다, 숙박시키다;(충분한 공간을) 제공하다\n(조건, 요구 등을)만족시키다"
+  },
+  {
+    "id": "day18-697",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "available",
+    "meaning": "(사물이)이용 가능한;\n(사람이) 시간이 있는"
+  },
+  {
+    "id": "day18-698",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "reception",
+    "meaning": "환영회; (호텔, 회사, 병원 등의)접수처"
+  },
+  {
+    "id": "day18-699",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "in advance",
+    "meaning": "미리, 사전에"
+  },
+  {
+    "id": "day18-700",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "refreshments",
+    "meaning": "다과, 가벼운 음식물"
+  },
+  {
+    "id": "day18-701",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "make",
+    "meaning": "~을 하다, ~을 만들다"
+  },
+  {
+    "id": "day18-702",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "cater",
+    "meaning": "(연회 등의)음식물을 공급하다"
+  },
+  {
+    "id": "day18-703",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "reservation",
+    "meaning": "예약, 지정; 보호구역"
+  },
+  {
+    "id": "day18-704",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "beverage",
+    "meaning": "음료"
+  },
+  {
+    "id": "day18-705",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "confirm",
+    "meaning": "확인하다"
+  },
+  {
+    "id": "day18-706",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "cancel",
+    "meaning": "취소하다"
+  },
+  {
+    "id": "day18-707",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "rate",
+    "meaning": "요금"
+  },
+  {
+    "id": "day18-708",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "conviniently",
+    "meaning": "편리하게"
+  },
+  {
+    "id": "day18-709",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "decorate",
+    "meaning": "장식하다"
+  },
+  {
+    "id": "day18-710",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "information",
+    "meaning": "정보, 자료"
+  },
+  {
+    "id": "day18-711",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "retain",
+    "meaning": "유지하다, 보유하다"
+  },
+  {
+    "id": "day18-712",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "atmosphere",
+    "meaning": "분위기, 환경"
+  },
+  {
+    "id": "day18-713",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "cuisine",
+    "meaning": "(독특한)요리"
+  },
+  {
+    "id": "day18-714",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "sequence",
+    "meaning": "순서, 차례"
+  },
+  {
+    "id": "day18-715",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "extensive",
+    "meaning": "광범위한, 넓은"
+  },
+  {
+    "id": "day18-716",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "prior",
+    "meaning": "전의, 먼저의"
+  },
+  {
+    "id": "day18-717",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "book",
+    "meaning": "예약하다"
+  },
+  {
+    "id": "day18-718",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "amenity",
+    "meaning": "편의 시설"
+  },
+  {
+    "id": "day18-719",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "belongings",
+    "meaning": "소지품, 소유물"
+  },
+  {
+    "id": "day18-720",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "entirely",
+    "meaning": "완전히"
+  },
+  {
+    "id": "day18-721",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "ease",
+    "meaning": "완화시키다, 쉬움, 용이함"
+  },
+  {
+    "id": "day18-722",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "ingredient",
+    "meaning": "재료, 성분"
+  },
+  {
+    "id": "day18-723",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "sip",
+    "meaning": "음미하며 마시다, 홀짝거리다"
+  },
+  {
+    "id": "day18-724",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "stir",
+    "meaning": "휘젓다, 뒤섞다"
+  },
+  {
+    "id": "day18-725",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "choice",
+    "meaning": "선택물, 선택 사항, 선택"
+  },
+  {
+    "id": "day18-726",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "complication",
+    "meaning": "복잡한 문제"
+  },
+  {
+    "id": "day18-727",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "freshness",
+    "meaning": "신선함"
+  },
+  {
+    "id": "day18-728",
+    "day": "day18",
+    "dayNumber": 18,
+    "english": "occupancy",
+    "meaning": "(호텔등의)이용률"
+  },
+  {
+    "id": "day19-729",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "decline",
+    "meaning": "감소, 하락,(초대,신청을)거절하다"
+  },
+  {
+    "id": "day19-730",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "markedly",
+    "meaning": "현저하게, 눈에 띄게"
+  },
+  {
+    "id": "day19-731",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "increase",
+    "meaning": "인상, 증가, 증가하다"
+  },
+  {
+    "id": "day19-732",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "revenue",
+    "meaning": "수입"
+  },
+  {
+    "id": "day19-733",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "projection",
+    "meaning": "예상(치)"
+  },
+  {
+    "id": "day19-734",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "substantial",
+    "meaning": "상당한"
+  },
+  {
+    "id": "day19-735",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "anticipate",
+    "meaning": "예상하다, 기대하다\n(anticipation 예상)"
+  },
+  {
+    "id": "day19-736",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "significantly",
+    "meaning": "상당히, 두드러지게"
+  },
+  {
+    "id": "day19-737",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "estimate",
+    "meaning": "추정하다, 추산하다, 추정(치), 추산"
+  },
+  {
+    "id": "day19-738",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "shift",
+    "meaning": "옮기다, 이동하다, 변화, 교대근무"
+  },
+  {
+    "id": "day19-739",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "fee",
+    "meaning": "요금, 수수료"
+  },
+  {
+    "id": "day19-740",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "production",
+    "meaning": "생산량, 생산"
+  },
+  {
+    "id": "day19-741",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "sale",
+    "meaning": "(-s)매출액, 매상고; (할인)판매"
+  },
+  {
+    "id": "day19-742",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "impressive",
+    "meaning": "굉장한, 인상적인"
+  },
+  {
+    "id": "day19-743",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "representative",
+    "meaning": "직원, 외판원; 대표자"
+  },
+  {
+    "id": "day19-744",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "recent",
+    "meaning": "최근의"
+  },
+  {
+    "id": "day19-745",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "exceed",
+    "meaning": "~을 초과하다\n(exceedingly 대단히, 몹시)\n(exceedably 넘을 수 있는)"
+  },
+  {
+    "id": "day19-746",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "improvement",
+    "meaning": "향상"
+  },
+  {
+    "id": "day19-747",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "employer",
+    "meaning": "고용주"
+  },
+  {
+    "id": "day19-748",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "regular",
+    "meaning": "정기적인; 단골의"
+  },
+  {
+    "id": "day19-749",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "summarize",
+    "meaning": "요약하다"
+  },
+  {
+    "id": "day19-750",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "typically",
+    "meaning": "보통, 일반적으로"
+  },
+  {
+    "id": "day19-751",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "whole",
+    "meaning": "전체의, 온전한"
+  },
+  {
+    "id": "day19-752",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "growth",
+    "meaning": "성장, 발전"
+  },
+  {
+    "id": "day19-753",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "figure",
+    "meaning": "총액, 합계 수"
+  },
+  {
+    "id": "day19-754",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "steady",
+    "meaning": "꾸준한; 안정된"
+  },
+  {
+    "id": "day19-755",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "frequent",
+    "meaning": "빈번한, 잦은"
+  },
+  {
+    "id": "day19-756",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "achieve",
+    "meaning": "달성하다, 성취하다"
+  },
+  {
+    "id": "day19-757",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "assumption",
+    "meaning": "추정, 산정, 가정"
+  },
+  {
+    "id": "day19-758",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "share",
+    "meaning": "공유하다, 함께쓰다;\n(생각, 경험, 감정을 남과)함께 나누다\n몫, 지분"
+  },
+  {
+    "id": "day19-759",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "incur",
+    "meaning": "(손실을)입다, (빚을)지다"
+  },
+  {
+    "id": "day19-760",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "slightly",
+    "meaning": "약간"
+  },
+  {
+    "id": "day19-761",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "profit",
+    "meaning": "수익, 이익"
+  },
+  {
+    "id": "day19-762",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "reliant",
+    "meaning": "의존하는, 의지하는\n(reliantly 의지하여)"
+  },
+  {
+    "id": "day19-763",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "illustrate",
+    "meaning": "분명히 보여주다, 설명하다\n(illustrate 설명,해설,삽화)"
+  },
+  {
+    "id": "day19-764",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "inaccurate",
+    "meaning": "부정확한"
+  },
+  {
+    "id": "day19-765",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "percentage",
+    "meaning": "비율, 백분율"
+  },
+  {
+    "id": "day19-766",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "reduce",
+    "meaning": "줄이다, 감소시키다"
+  },
+  {
+    "id": "day19-767",
+    "day": "day19",
+    "dayNumber": 19,
+    "english": "tend",
+    "meaning": "~하는 경향이 있다, ~하기 쉽다"
+  },
+  {
+    "id": "day20-768",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "audit",
+    "meaning": "회계 감사, 심사"
+  },
+  {
+    "id": "day20-769",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "accounting",
+    "meaning": "회계"
+  },
+  {
+    "id": "day20-770",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "budget",
+    "meaning": "예산"
+  },
+  {
+    "id": "day20-771",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "financial",
+    "meaning": "재정의, 금전상의"
+  },
+  {
+    "id": "day20-772",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "curtail",
+    "meaning": "~을 줄이다, 삭감하다\n(curtailment 단축)"
+  },
+  {
+    "id": "day20-773",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "deficit",
+    "meaning": "적자, 부족액"
+  },
+  {
+    "id": "day20-774",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "recently",
+    "meaning": "최근에"
+  },
+  {
+    "id": "day20-775",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "substantially",
+    "meaning": "크게, 상당히\n(substantial 상당한, 재력이 있는)"
+  },
+  {
+    "id": "day20-776",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "committee",
+    "meaning": "위원회"
+  },
+  {
+    "id": "day20-777",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "frequently",
+    "meaning": "자주, 흔히"
+  },
+  {
+    "id": "day20-778",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "capability",
+    "meaning": "능력, 역량"
+  },
+  {
+    "id": "day20-779",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "proceeds",
+    "meaning": "수익금"
+  },
+  {
+    "id": "day20-780",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "reimburse",
+    "meaning": "변제하다, 상환하다"
+  },
+  {
+    "id": "day20-781",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "considerably",
+    "meaning": "상당히, 많이"
+  },
+  {
+    "id": "day20-782",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "adequate",
+    "meaning": "충분한, 적절한\n(adequately 적절히, 충분히)"
+  },
+  {
+    "id": "day20-783",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "total",
+    "meaning": "총계의, 전부의"
+  },
+  {
+    "id": "day20-784",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "allocate",
+    "meaning": "할당하다, 배분하다\n(allocation 할당)"
+  },
+  {
+    "id": "day20-785",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "inspector",
+    "meaning": "조사관, 감독관\n(inspect 검사하다)"
+  },
+  {
+    "id": "day20-786",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "preferred",
+    "meaning": "선호되는, 우선의"
+  },
+  {
+    "id": "day20-787",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "quarter",
+    "meaning": "사분기; 4분의1"
+  },
+  {
+    "id": "day20-788",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "interrupt",
+    "meaning": "중단시키다, 방해하다\n(interruption 방해, 중지, 중단)"
+  },
+  {
+    "id": "day20-789",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "browse",
+    "meaning": "흝어보다, 둘러보다"
+  },
+  {
+    "id": "day20-790",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "prompt",
+    "meaning": "즉각적인; 신속한, 촉발하다, 유도하다 (promptly 신속히)"
+  },
+  {
+    "id": "day20-791",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "deduct",
+    "meaning": "공제하다, 빼다\n(deduction 공제)"
+  },
+  {
+    "id": "day20-792",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "measurement",
+    "meaning": "측정, 측량; 치수"
+  },
+  {
+    "id": "day20-793",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "shorten",
+    "meaning": "단축하다, 짧게하다"
+  },
+  {
+    "id": "day20-794",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "amend",
+    "meaning": "수정하다\n(amendable 개정할 수 있는)"
+  },
+  {
+    "id": "day20-795",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "calculate",
+    "meaning": "계산하다, 산출하다"
+  },
+  {
+    "id": "day20-796",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "exempt",
+    "meaning": "면제된, ~이 없는\n(exemption 면제)"
+  },
+  {
+    "id": "day20-797",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "deficient",
+    "meaning": "부족한, 불충분한"
+  },
+  {
+    "id": "day20-798",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "compare",
+    "meaning": "비교하다"
+  },
+  {
+    "id": "day20-799",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "fortunate",
+    "meaning": "운 좋은"
+  },
+  {
+    "id": "day20-800",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "expenditure",
+    "meaning": "지출, 비용"
+  },
+  {
+    "id": "day20-801",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "accurately",
+    "meaning": "정확하게"
+  },
+  {
+    "id": "day20-802",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "worth",
+    "meaning": "~의 가치가 있는, (얼마)어치, 가치"
+  },
+  {
+    "id": "day20-803",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "excess",
+    "meaning": "초과, 초과량"
+  },
+  {
+    "id": "day20-804",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "fiscal",
+    "meaning": "회계의, 재정상의"
+  },
+  {
+    "id": "day20-805",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "incidental",
+    "meaning": "부수적인"
+  },
+  {
+    "id": "day20-806",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "inflation",
+    "meaning": "물가상승, 인플레이션, 통화팽창"
+  },
+  {
+    "id": "day20-807",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "liable",
+    "meaning": "책임져야 할; ~하기 쉬운"
+  },
+  {
+    "id": "day20-808",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "spend",
+    "meaning": "~을 쓰다, 소비하다"
+  },
+  {
+    "id": "day20-809",
+    "day": "day20",
+    "dayNumber": 20,
+    "english": "turnover",
+    "meaning": "총 매상고, 거래액; 이직률"
+  },
+  {
+    "id": "day21-810",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "announce",
+    "meaning": "발표하다"
+  },
+  {
+    "id": "day21-811",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "interested",
+    "meaning": "관련 있는; 관심이 있는"
+  },
+  {
+    "id": "day21-812",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "active",
+    "meaning": "적극적인, 활발한"
+  },
+  {
+    "id": "day21-813",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "accept",
+    "meaning": "수락하다, 승낙하다"
+  },
+  {
+    "id": "day21-814",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "foresee",
+    "meaning": "예견하다, 예감하다"
+  },
+  {
+    "id": "day21-815",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "expansion",
+    "meaning": "확장, 팽창"
+  },
+  {
+    "id": "day21-816",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "relocate",
+    "meaning": "(공장 등을)이전하다"
+  },
+  {
+    "id": "day21-817",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "competitor",
+    "meaning": "경쟁업체, 경쟁자"
+  },
+  {
+    "id": "day21-818",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "asset",
+    "meaning": "자산"
+  },
+  {
+    "id": "day21-819",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "contribute",
+    "meaning": "기여하다, 공헌하다"
+  },
+  {
+    "id": "day21-820",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "dedicated",
+    "meaning": "(목표 등에)전념하는, 헌신적인"
+  },
+  {
+    "id": "day21-821",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "misplace",
+    "meaning": "잃어버리다, 위치를 잘못 잡다"
+  },
+  {
+    "id": "day21-822",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "considerable",
+    "meaning": "(정도나 양이)상당한"
+  },
+  {
+    "id": "day21-823",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "last",
+    "meaning": "지속되다"
+  },
+  {
+    "id": "day21-824",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "emerge",
+    "meaning": "부상하다, 나타나다\n(merge 합병하다)"
+  },
+  {
+    "id": "day21-825",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "grow",
+    "meaning": "성장하다, 성장시키다, 증가시키다"
+  },
+  {
+    "id": "day21-826",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "select",
+    "meaning": "선발하다, 선택하다"
+  },
+  {
+    "id": "day21-827",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "merge",
+    "meaning": "합병하다, 병합하다"
+  },
+  {
+    "id": "day21-828",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "imply",
+    "meaning": "암시하다, 넌지시 나타내다, 의미하다"
+  },
+  {
+    "id": "day21-829",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "vital",
+    "meaning": "필수적인"
+  },
+  {
+    "id": "day21-830",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "persist",
+    "meaning": "(집요하게)계속하다, 계속되다, 지속되다\n(continue 계속되다, 계속하다)"
+  },
+  {
+    "id": "day21-831",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "independent",
+    "meaning": "독립적인, 독자적인"
+  },
+  {
+    "id": "day21-832",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "force",
+    "meaning": "세력"
+  },
+  {
+    "id": "day21-833",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "establish",
+    "meaning": "설립하다"
+  },
+  {
+    "id": "day21-834",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "initiate",
+    "meaning": "(사업 등을) 착수하다, 시작하다\n(commence 시작하다)"
+  },
+  {
+    "id": "day21-835",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "enhance",
+    "meaning": "(질 등을) 향상시키다, 높이다, 강화하다\n(strengthen 강화하다)\n(reinforce 보강하다, 강화하다)"
+  },
+  {
+    "id": "day21-836",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "renowned",
+    "meaning": "저명한, 유명한, 명성이 있는"
+  },
+  {
+    "id": "day21-837",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "informed",
+    "meaning": "정보에 근거한\n(inform 알리다, 통지하다)"
+  },
+  {
+    "id": "day21-838",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "minutes",
+    "meaning": "회의록"
+  },
+  {
+    "id": "day21-839",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "waive",
+    "meaning": "(규칙 등을)적용하지 않다,\n(권리,청구등을)포기하다\n(abandon 버리다, 단념하다, 그만두다)"
+  },
+  {
+    "id": "day21-840",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "reach",
+    "meaning": "(치수,양 등이)~에 달하다;\n~에 도착하다"
+  },
+  {
+    "id": "day21-841",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "authority",
+    "meaning": "권한; 당국"
+  },
+  {
+    "id": "day21-842",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "acquire",
+    "meaning": "매입하다, 취득하다\n(inquire 묻다)\n(inquiry 조사, 문의)"
+  },
+  {
+    "id": "day21-843",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "surpass",
+    "meaning": "~을 능가하다, 넘어서다"
+  },
+  {
+    "id": "day21-844",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "run",
+    "meaning": "~을 운영하다, 경영하다"
+  },
+  {
+    "id": "day21-845",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "improbable",
+    "meaning": "사실이라고 생각할 수 없는,\n일어날 것 같지 않은\n(probable 있음직한, 일어날것같은)"
+  },
+  {
+    "id": "day21-846",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "edge",
+    "meaning": "우위, 유리함; 가장자리, 끝"
+  },
+  {
+    "id": "day21-847",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "simultaneously",
+    "meaning": "동시에\n(coincidentally 우연히 일치하게 동시발생적으로)"
+  },
+  {
+    "id": "day21-848",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "reveal",
+    "meaning": "밝히다, 누설하다"
+  },
+  {
+    "id": "day21-849",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "productivity",
+    "meaning": "생산성"
+  },
+  {
+    "id": "day21-850",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "uncertain",
+    "meaning": "확신이 없는, 불확실한"
+  },
+  {
+    "id": "day21-851",
+    "day": "day21",
+    "dayNumber": 21,
+    "english": "premier",
+    "meaning": "으뜸의, 첫째의"
+  },
+  {
+    "id": "day22-852",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "agenda",
+    "meaning": "의제, 의사일정"
+  },
+  {
+    "id": "day22-853",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "convene",
+    "meaning": "(회원 등이)모이다, (회의가)개최되다\n(convener 의장,소집자)"
+  },
+  {
+    "id": "day22-854",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "refute",
+    "meaning": "부인하다, 반박하다\n(refutation 반박, 반론)"
+  },
+  {
+    "id": "day22-855",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "coordination",
+    "meaning": "조정"
+  },
+  {
+    "id": "day22-856",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "unanimous",
+    "meaning": "만장일치의, 동의하는\n(unanimously  만장일치로)"
+  },
+  {
+    "id": "day22-857",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "convince",
+    "meaning": "납득시키다, 확신시키다"
+  },
+  {
+    "id": "day22-858",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "consensus",
+    "meaning": "여론, 일치된 의견"
+  },
+  {
+    "id": "day22-859",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "defer",
+    "meaning": "연기하다, 미루다\n(differ 다르다)"
+  },
+  {
+    "id": "day22-860",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "usually",
+    "meaning": "보통, 일반적으로"
+  },
+  {
+    "id": "day22-861",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "reschedule",
+    "meaning": "일정을 바꾸다"
+  },
+  {
+    "id": "day22-862",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "meeting",
+    "meaning": "회의"
+  },
+  {
+    "id": "day22-863",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "determine",
+    "meaning": "알아내다; 결정하다, 확정하다"
+  },
+  {
+    "id": "day22-864",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "report",
+    "meaning": "보고하다; 출두하다,\n(직장,회의 등에 도착을)알리다,\n보고서; 보도, 기록"
+  },
+  {
+    "id": "day22-865",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "comment",
+    "meaning": "논평하다, 언급하다"
+  },
+  {
+    "id": "day22-866",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "phase",
+    "meaning": "단계"
+  },
+  {
+    "id": "day22-867",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "approve",
+    "meaning": "승인하다, 찬성하다"
+  },
+  {
+    "id": "day22-868",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "enclosed",
+    "meaning": "동봉된"
+  },
+  {
+    "id": "day22-869",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "easy",
+    "meaning": "쉬운, 용이한"
+  },
+  {
+    "id": "day22-870",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "record",
+    "meaning": "기록; 경력, 이력, 기록하다"
+  },
+  {
+    "id": "day22-871",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "suggestion",
+    "meaning": "제안"
+  },
+  {
+    "id": "day22-872",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "attention",
+    "meaning": "주의, 경청"
+  },
+  {
+    "id": "day22-873",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "object",
+    "meaning": "반대하다"
+  },
+  {
+    "id": "day22-874",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "coincidentally",
+    "meaning": "우연히, 일치하게, 동시 발생적으로\n(coincident 일치하는)"
+  },
+  {
+    "id": "day22-875",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "crowded",
+    "meaning": "붐비는, 복잡한"
+  },
+  {
+    "id": "day22-876",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "undergo",
+    "meaning": "겪다, 거치다, 경험하다"
+  },
+  {
+    "id": "day22-877",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "outcome",
+    "meaning": "결과 (=consequence)"
+  },
+  {
+    "id": "day22-878",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "narrowly",
+    "meaning": "주의 깊게, 좁게; 가까스로, 간신히, 겨우"
+  },
+  {
+    "id": "day22-879",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "differ",
+    "meaning": "의견을 달리하다, 다르다"
+  },
+  {
+    "id": "day22-880",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "discuss",
+    "meaning": "논의하다, 토론하다"
+  },
+  {
+    "id": "day22-881",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "give",
+    "meaning": "(연설, 수업 등을)하다"
+  },
+  {
+    "id": "day22-882",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "brief",
+    "meaning": "~에게 간단히 설명하다, 브리핑하다"
+  },
+  {
+    "id": "day22-883",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "distract",
+    "meaning": "(주의를)산만하게 하다, 빗기게 하다(distraction 주의산만, 방심)"
+  },
+  {
+    "id": "day22-884",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "emphasis",
+    "meaning": "강조, 중점"
+  },
+  {
+    "id": "day22-885",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "press",
+    "meaning": "언론(계),보도기관, 누르다"
+  },
+  {
+    "id": "day22-886",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "organize",
+    "meaning": "준비하다, 조직하다, 정리하다"
+  },
+  {
+    "id": "day22-887",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "mention",
+    "meaning": "언급하다"
+  },
+  {
+    "id": "day22-888",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "persuasive",
+    "meaning": "설득력 있는"
+  },
+  {
+    "id": "day22-889",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "understanding",
+    "meaning": "이해심 있는"
+  },
+  {
+    "id": "day22-890",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "adjourn",
+    "meaning": "(회의 등을)휴회하다"
+  },
+  {
+    "id": "day22-891",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "constructive",
+    "meaning": "건설적인"
+  },
+  {
+    "id": "day22-892",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "preside",
+    "meaning": "(회의의)사회를 보다, ~의 의장을 맡아보다"
+  },
+  {
+    "id": "day22-893",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "irrelevant",
+    "meaning": "관계가 없는, 무관한\n(relevant 관계가 있는)"
+  },
+  {
+    "id": "day22-894",
+    "day": "day22",
+    "dayNumber": 22,
+    "english": "constraint",
+    "meaning": "제한(=restriction)"
+  },
+  {
+    "id": "day23-895",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "host",
+    "meaning": "(대회 등을)주최하다"
+  },
+  {
+    "id": "day23-896",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "annual",
+    "meaning": "매년의"
+  },
+  {
+    "id": "day23-897",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "purpose",
+    "meaning": "목적, 의도"
+  },
+  {
+    "id": "day23-898",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "enroll",
+    "meaning": "등록하다"
+  },
+  {
+    "id": "day23-899",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "lecture",
+    "meaning": "강의, 강연"
+  },
+  {
+    "id": "day23-900",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "participant",
+    "meaning": "참가자"
+  },
+  {
+    "id": "day23-901",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "attend",
+    "meaning": "참석하다, 출석하다"
+  },
+  {
+    "id": "day23-902",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "encourage",
+    "meaning": "장려하다, 복돋아주다"
+  },
+  {
+    "id": "day23-903",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "leave",
+    "meaning": "휴가, 떠나다, 남기다"
+  },
+  {
+    "id": "day23-904",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "recommendation",
+    "meaning": "추천사항, 추천"
+  },
+  {
+    "id": "day23-905",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "conference",
+    "meaning": "회의, 회담"
+  },
+  {
+    "id": "day23-906",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "schedule",
+    "meaning": "~을 예정하다"
+  },
+  {
+    "id": "day23-907",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "include",
+    "meaning": "포함하다"
+  },
+  {
+    "id": "day23-908",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "result",
+    "meaning": "결과,(~의 결과로)되다"
+  },
+  {
+    "id": "day23-909",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "register",
+    "meaning": "등록하다"
+  },
+  {
+    "id": "day23-910",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "require",
+    "meaning": "요구하다"
+  },
+  {
+    "id": "day23-911",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "grateful",
+    "meaning": "고마워하는, 감사하는"
+  },
+  {
+    "id": "day23-912",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "overtime",
+    "meaning": "초과근무, 야근"
+  },
+  {
+    "id": "day23-913",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "responsibility",
+    "meaning": "부담, 책임, 의무"
+  },
+  {
+    "id": "day23-914",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "assent",
+    "meaning": "찬성하다, 승인, 동의\n(approval 승인)\n(approve 찬성하다)\n(prove 증명하다)"
+  },
+  {
+    "id": "day23-915",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "regard",
+    "meaning": "~을 -으로 간주하다, 여기다,\n관심,배려"
+  },
+  {
+    "id": "day23-916",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "tentative",
+    "meaning": "임시적인, 잠정적인"
+  },
+  {
+    "id": "day23-917",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "welcome",
+    "meaning": "반가운, 기꺼이 받아들여지는"
+  },
+  {
+    "id": "day23-918",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "function",
+    "meaning": "행사, 연회"
+  },
+  {
+    "id": "day23-919",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "commence",
+    "meaning": "시작되다"
+  },
+  {
+    "id": "day23-920",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "objective",
+    "meaning": "목표, 목적"
+  },
+  {
+    "id": "day23-921",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "excited",
+    "meaning": "신이 난, 들뜬"
+  },
+  {
+    "id": "day23-922",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "reimbursement",
+    "meaning": "상환, 변제, 배상"
+  },
+  {
+    "id": "day23-923",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "treatment",
+    "meaning": "대우, 처우"
+  },
+  {
+    "id": "day23-924",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "honor",
+    "meaning": "존경, 명예"
+  },
+  {
+    "id": "day23-925",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "emphasize",
+    "meaning": "강조하다"
+  },
+  {
+    "id": "day23-926",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "entry",
+    "meaning": "(경기 등의)참가자, 출품물"
+  },
+  {
+    "id": "day23-927",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "bonus",
+    "meaning": "상여금, 보너스"
+  },
+  {
+    "id": "day23-928",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "salary",
+    "meaning": "급여"
+  },
+  {
+    "id": "day23-929",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "earn",
+    "meaning": "(금전 등을)벌다; (평판을)받다, 얻다"
+  },
+  {
+    "id": "day23-930",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "arise",
+    "meaning": "(문제 등이)발생하다, 일어나다 = occur"
+  },
+  {
+    "id": "day23-931",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "labor",
+    "meaning": "노동"
+  },
+  {
+    "id": "day23-932",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "union",
+    "meaning": "노동조합"
+  },
+  {
+    "id": "day23-933",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "existing",
+    "meaning": "기존의, 현행의"
+  },
+  {
+    "id": "day23-934",
+    "day": "day23",
+    "dayNumber": 23,
+    "english": "exploit",
+    "meaning": "착취하다, 부당하게 이용하다\n(exploitation 개발,개척,약탈,착취)"
+  },
+  {
+    "id": "day24-935",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "appoint",
+    "meaning": "임명하다, 지명하다"
+  },
+  {
+    "id": "day24-936",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "appraisal",
+    "meaning": "평가"
+  },
+  {
+    "id": "day24-937",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "promote",
+    "meaning": "승진시키다; 촉진하다"
+  },
+  {
+    "id": "day24-938",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "skilled",
+    "meaning": "숙련된, 노련한"
+  },
+  {
+    "id": "day24-939",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "radically",
+    "meaning": "완전히, 철저히, 근본적으로\n(radical 근본적인, 과격한)"
+  },
+  {
+    "id": "day24-940",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "exceptional",
+    "meaning": "뛰어난, 예외적인\n(exception 예외, 이의, 반대)"
+  },
+  {
+    "id": "day24-941",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "appreciation",
+    "meaning": "감사"
+  },
+  {
+    "id": "day24-942",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "evaluate",
+    "meaning": "평가하다"
+  },
+  {
+    "id": "day24-943",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "suggest",
+    "meaning": "제안하다, 추천하다"
+  },
+  {
+    "id": "day24-944",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "preference",
+    "meaning": "선호"
+  },
+  {
+    "id": "day24-945",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "management",
+    "meaning": "경영진, 경영"
+  },
+  {
+    "id": "day24-946",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "predict",
+    "meaning": "예측하다"
+  },
+  {
+    "id": "day24-947",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "transfer",
+    "meaning": "보내다; 전근시키다"
+  },
+  {
+    "id": "day24-948",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "award",
+    "meaning": "상\n(reward 보상하다, 포상,보상)"
+  },
+  {
+    "id": "day24-949",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "mandatory",
+    "meaning": "의무적인"
+  },
+  {
+    "id": "day24-950",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "competent",
+    "meaning": "유능한, 능숙한\n(competence 능력)"
+  },
+  {
+    "id": "day24-951",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "performance",
+    "meaning": "실적,성과; 공연,연주, 연기"
+  },
+  {
+    "id": "day24-952",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "reward",
+    "meaning": "~에 보답하다, 보상하다, 포상,보상\n(award 상)"
+  },
+  {
+    "id": "day24-953",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "search",
+    "meaning": "찾기, 수색, 조사"
+  },
+  {
+    "id": "day24-954",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "inexperienced",
+    "meaning": "경험없는, 미숙한"
+  },
+  {
+    "id": "day24-955",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "early",
+    "meaning": "시간상 이른, 조기의"
+  },
+  {
+    "id": "day24-956",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "designate",
+    "meaning": "지명하다, 지정하다"
+  },
+  {
+    "id": "day24-957",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "executive",
+    "meaning": "경영의,관리의"
+  },
+  {
+    "id": "day24-958",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "dedication",
+    "meaning": "헌신"
+  },
+  {
+    "id": "day24-959",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "unanimously",
+    "meaning": "만장일치로\n(unanimous 만장일치의)\n(anonymously 익명으로, 특색없이)"
+  },
+  {
+    "id": "day24-960",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "progress",
+    "meaning": "진행, 진척, 진전, 진보하다, 발전하다"
+  },
+  {
+    "id": "day24-961",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "congratulate",
+    "meaning": "축하하다"
+  },
+  {
+    "id": "day24-962",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "dismiss",
+    "meaning": "해임하다, 해고하다"
+  },
+  {
+    "id": "day24-963",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "independence",
+    "meaning": "독립성"
+  },
+  {
+    "id": "day24-964",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "participation",
+    "meaning": "참여, 참가, 가입"
+  },
+  {
+    "id": "day24-965",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "praise",
+    "meaning": "칭찬"
+  },
+  {
+    "id": "day24-966",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "accomplishment",
+    "meaning": "성과,업적"
+  },
+  {
+    "id": "day24-967",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "deliberation",
+    "meaning": "토의, 심의, 숙고\n(deliberate 고의의, 숙고하다)"
+  },
+  {
+    "id": "day24-968",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "leadership",
+    "meaning": "리더십, 지도력"
+  },
+  {
+    "id": "day24-969",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "retire",
+    "meaning": "퇴직하다, 은퇴하다"
+  },
+  {
+    "id": "day24-970",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "nomination",
+    "meaning": "임명, 지명"
+  },
+  {
+    "id": "day24-971",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "reorganize",
+    "meaning": "재편성하다, 재조직하다\n(recognize 인식하다)\n(organize 조직하다)"
+  },
+  {
+    "id": "day24-972",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "serve",
+    "meaning": "근무하다, 일하다"
+  },
+  {
+    "id": "day24-973",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "encouragement",
+    "meaning": "격려"
+  },
+  {
+    "id": "day24-974",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "resignation",
+    "meaning": "사임, 사직, 사직서"
+  },
+  {
+    "id": "day24-975",
+    "day": "day24",
+    "dayNumber": 24,
+    "english": "strictly",
+    "meaning": "엄격히"
+  },
+  {
+    "id": "day25-976",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "congestion",
+    "meaning": "(교통의)체증, 혼잡\n(congest 혼잡하게 하다)"
+  },
+  {
+    "id": "day25-977",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "alleviate",
+    "meaning": "완화하다"
+  },
+  {
+    "id": "day25-978",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "divert",
+    "meaning": "우회시키다, 다른 곳으로 돌리다"
+  },
+  {
+    "id": "day25-979",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "detour",
+    "meaning": "우회"
+  },
+  {
+    "id": "day25-980",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "fuel",
+    "meaning": "연료"
+  },
+  {
+    "id": "day25-981",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "malfunction",
+    "meaning": "오작동, 기능불량"
+  },
+  {
+    "id": "day25-982",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "permit",
+    "meaning": "허락하다, 허가증"
+  },
+  {
+    "id": "day25-983",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "transportation",
+    "meaning": "교통(수단), 운송 수단"
+  },
+  {
+    "id": "day25-984",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "opportunity",
+    "meaning": "기회"
+  },
+  {
+    "id": "day25-985",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "clearly",
+    "meaning": "명확히"
+  },
+  {
+    "id": "day25-986",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "ongoing",
+    "meaning": "계속 진행 중인"
+  },
+  {
+    "id": "day25-987",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "detailed",
+    "meaning": "상세한"
+  },
+  {
+    "id": "day25-988",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "alternative",
+    "meaning": "대안, 대체, 다른, 대신의"
+  },
+  {
+    "id": "day25-989",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "obtain",
+    "meaning": "획득하다, 얻다"
+  },
+  {
+    "id": "day25-990",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "designated",
+    "meaning": "지정된"
+  },
+  {
+    "id": "day25-991",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "intersection",
+    "meaning": "교차로, 교차지점"
+  },
+  {
+    "id": "day25-992",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "equip",
+    "meaning": "갖추다, 설비하다"
+  },
+  {
+    "id": "day25-993",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "commute",
+    "meaning": "통근하다"
+  },
+  {
+    "id": "day25-994",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "downtown",
+    "meaning": "시내에서, 도심지로"
+  },
+  {
+    "id": "day25-995",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "automotive",
+    "meaning": "자동차의"
+  },
+  {
+    "id": "day25-996",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "closure",
+    "meaning": "폐쇄"
+  },
+  {
+    "id": "day25-997",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "vehicle",
+    "meaning": "차량, 운송 수단"
+  },
+  {
+    "id": "day25-998",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "platform",
+    "meaning": "승강장"
+  },
+  {
+    "id": "day25-999",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "official",
+    "meaning": "공무원, 관리, 공식적인"
+  },
+  {
+    "id": "day25-1000",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "transit",
+    "meaning": "교통, 수송, 통과하다"
+  },
+  {
+    "id": "day25-1001",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "fare",
+    "meaning": "교통요금"
+  },
+  {
+    "id": "day25-1002",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "expense",
+    "meaning": "비용, 지출"
+  },
+  {
+    "id": "day25-1003",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "trust",
+    "meaning": "신뢰, 신임, 믿다, 신뢰하다"
+  },
+  {
+    "id": "day25-1004",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "head",
+    "meaning": "(~의 방향으로)나아가다, 향하게 하다"
+  },
+  {
+    "id": "day25-1005",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "drive",
+    "meaning": "(차 등을)운전하다, 타고가다, 조종하다"
+  },
+  {
+    "id": "day25-1006",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "fine",
+    "meaning": "벌금"
+  },
+  {
+    "id": "day25-1007",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "pass",
+    "meaning": "지나가다, 통과하다"
+  },
+  {
+    "id": "day25-1008",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "securely",
+    "meaning": "(매듭 등이)단단하게, 튼튼하게"
+  },
+  {
+    "id": "day25-1009",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "prominently",
+    "meaning": "눈에 잘 띄게, 두드러지게\n(prominent 눈에 띄는)"
+  },
+  {
+    "id": "day25-1010",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "reserved",
+    "meaning": "예약된, 예약한; 지정된"
+  },
+  {
+    "id": "day25-1011",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "average",
+    "meaning": "평균치, 평균"
+  },
+  {
+    "id": "day25-1012",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "collision",
+    "meaning": "충돌"
+  },
+  {
+    "id": "day25-1013",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "tow",
+    "meaning": "견인하다"
+  },
+  {
+    "id": "day25-1014",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "reverse",
+    "meaning": "뒤의, 반대의"
+  },
+  {
+    "id": "day25-1015",
+    "day": "day25",
+    "dayNumber": 25,
+    "english": "obstruct",
+    "meaning": "(전망 등을)가리다, 차단하다;\n(도로 등을)막다\n(obstruction 장애물, 방해물)"
+  },
+  {
+    "id": "day26-1016",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "delinquent",
+    "meaning": "(세금 등이)연체된, 미불의"
+  },
+  {
+    "id": "day26-1017",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "overdue",
+    "meaning": "(지불,반납 등의)기한이 지난, 지불 기한이 넘은"
+  },
+  {
+    "id": "day26-1018",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "regrettably",
+    "meaning": "유감스럽게도"
+  },
+  {
+    "id": "day26-1019",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "balance",
+    "meaning": "잔고, 차감 잔액"
+  },
+  {
+    "id": "day26-1020",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "deposit",
+    "meaning": "입금하다, 예금하다"
+  },
+  {
+    "id": "day26-1021",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "investigation",
+    "meaning": "조사 (investigate 연구하다, 조사하다)"
+  },
+  {
+    "id": "day26-1022",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "account",
+    "meaning": "계좌; 설명; 고려"
+  },
+  {
+    "id": "day26-1023",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "statement",
+    "meaning": "명세서, 성명서"
+  },
+  {
+    "id": "day26-1024",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "amount",
+    "meaning": "액수, 양"
+  },
+  {
+    "id": "day26-1025",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "withdrawal",
+    "meaning": "(예금의)인출"
+  },
+  {
+    "id": "day26-1026",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "previously",
+    "meaning": "이전에"
+  },
+  {
+    "id": "day26-1027",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "due",
+    "meaning": "만기가 된, 지불 기일이 된;\n(금전 등이)~에게 마땅히 지급되어야 할"
+  },
+  {
+    "id": "day26-1028",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "receive",
+    "meaning": "받다, 수취하다"
+  },
+  {
+    "id": "day26-1029",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "expect",
+    "meaning": "예상하다, 기대하다"
+  },
+  {
+    "id": "day26-1030",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "certificate",
+    "meaning": "증명서, 증서"
+  },
+  {
+    "id": "day26-1031",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "document",
+    "meaning": "서류, 문서"
+  },
+  {
+    "id": "day26-1032",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "spending",
+    "meaning": "소비; 지출"
+  },
+  {
+    "id": "day26-1033",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "successfully",
+    "meaning": "성공적으로"
+  },
+  {
+    "id": "day26-1034",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "bill",
+    "meaning": "~에게 청구서를 보내다, 청구서, 계산서"
+  },
+  {
+    "id": "day26-1035",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "pleasure",
+    "meaning": "즐거움, 기쁜, 영광"
+  },
+  {
+    "id": "day26-1036",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "study",
+    "meaning": "연구"
+  },
+  {
+    "id": "day26-1037",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "summary",
+    "meaning": "요약, 개요\n(emphasize 강조하다)"
+  },
+  {
+    "id": "day26-1038",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "temporary",
+    "meaning": "임시의"
+  },
+  {
+    "id": "day26-1039",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "lower",
+    "meaning": "(양,가격을)줄이다"
+  },
+  {
+    "id": "day26-1040",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "transaction",
+    "meaning": "거래, 업무"
+  },
+  {
+    "id": "day26-1041",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "double",
+    "meaning": "두배로 만들다"
+  },
+  {
+    "id": "day26-1042",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "identification",
+    "meaning": "신분증, 신분 증명서"
+  },
+  {
+    "id": "day26-1043",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "dissatisfaction",
+    "meaning": "불만, 불평"
+  },
+  {
+    "id": "day26-1044",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "in common",
+    "meaning": "공통으로, 공동으로"
+  },
+  {
+    "id": "day26-1045",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "interest",
+    "meaning": "관심; 권리; 이자"
+  },
+  {
+    "id": "day26-1046",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "reject",
+    "meaning": "거절하다, 거부하다"
+  },
+  {
+    "id": "day26-1047",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "relation",
+    "meaning": "관계"
+  },
+  {
+    "id": "day26-1048",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "tentatively",
+    "meaning": "임시로, 시험적으로\n(tentative 시험적인, 임시의, 가설)"
+  },
+  {
+    "id": "day26-1049",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "alternatively",
+    "meaning": "그렇지 않으면, 그 대신에"
+  },
+  {
+    "id": "day26-1050",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "attentive",
+    "meaning": "주의 깊은, 세심한"
+  },
+  {
+    "id": "day26-1051",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "convert",
+    "meaning": "전환하다, 변환하다"
+  },
+  {
+    "id": "day26-1052",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "heavily",
+    "meaning": "몹시, 심하게"
+  },
+  {
+    "id": "day26-1053",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "loan",
+    "meaning": "대출, 대출금"
+  },
+  {
+    "id": "day26-1054",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "unexpected",
+    "meaning": "예기치 않은"
+  },
+  {
+    "id": "day26-1055",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "cash",
+    "meaning": "현금으로 바꾸다"
+  },
+  {
+    "id": "day26-1056",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "mortgage",
+    "meaning": "(담보)대출"
+  },
+  {
+    "id": "day26-1057",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "payable",
+    "meaning": "지불해야 하는"
+  },
+  {
+    "id": "day26-1058",
+    "day": "day26",
+    "dayNumber": 26,
+    "english": "personal",
+    "meaning": "개인의"
+  },
+  {
+    "id": "day27-1059",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "investment",
+    "meaning": "투자, 투자금"
+  },
+  {
+    "id": "day27-1060",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "incrative",
+    "meaning": "수익성 있는, 돈벌이가 되는\n(profit, earning, gainings 이익)\n(income 수입, 소득)"
+  },
+  {
+    "id": "day27-1061",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "inherently",
+    "meaning": "본질적으로\n(inherent 본래 갖추어져 있는, 고유의)"
+  },
+  {
+    "id": "day27-1062",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "secure",
+    "meaning": "확보하다, 얻어 내다;\n안전하게 지키다, 고정시키다"
+  },
+  {
+    "id": "day27-1063",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "foreseeable",
+    "meaning": "예견할 수 있는\n(oversee 감독하다)\n(overseas 외국의)"
+  },
+  {
+    "id": "day27-1064",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "innate",
+    "meaning": "타고난"
+  },
+  {
+    "id": "day27-1065",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "property",
+    "meaning": "재산"
+  },
+  {
+    "id": "day27-1066",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "on behalf of",
+    "meaning": "~을 대신해서"
+  },
+  {
+    "id": "day27-1067",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "lease",
+    "meaning": "임대차(계약)"
+  },
+  {
+    "id": "day27-1068",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "sponsor",
+    "meaning": "후원하다, 후원자"
+  },
+  {
+    "id": "day27-1069",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "propose",
+    "meaning": "제안하다"
+  },
+  {
+    "id": "day27-1070",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "support",
+    "meaning": "후원, 원조, 지지, 지원하다,\n후원하다; 살게하다,\n(생명, 기력 등을)유지하다"
+  },
+  {
+    "id": "day27-1071",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "distributuion",
+    "meaning": "분배, 배급"
+  },
+  {
+    "id": "day27-1072",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "consider",
+    "meaning": "고려하다"
+  },
+  {
+    "id": "day27-1073",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "nearly",
+    "meaning": "거의, 대략"
+  },
+  {
+    "id": "day27-1074",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "consent",
+    "meaning": "동의, 허락, 동의하다\n(consentaneous일치하는)"
+  },
+  {
+    "id": "day27-1075",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "gratitude",
+    "meaning": "고마움, 감사"
+  },
+  {
+    "id": "day27-1076",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "consult",
+    "meaning": "상의하다, 상담하다"
+  },
+  {
+    "id": "day27-1077",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "advice",
+    "meaning": "조언, 충고"
+  },
+  {
+    "id": "day27-1078",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "partially",
+    "meaning": "부분적으로, 일부분은"
+  },
+  {
+    "id": "day27-1079",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "evident",
+    "meaning": "분명한, 명백한,"
+  },
+  {
+    "id": "day27-1080",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "reliability",
+    "meaning": "신뢰도, 믿음직함"
+  },
+  {
+    "id": "day27-1081",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "cautious",
+    "meaning": "조심하는, 신중한"
+  },
+  {
+    "id": "day27-1082",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "insight",
+    "meaning": "식견, 통찰력"
+  },
+  {
+    "id": "day27-1083",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "portfolio",
+    "meaning": "포트폴리오, 투자 자산 구성"
+  },
+  {
+    "id": "day27-1084",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "possible",
+    "meaning": "가능한, 있음직한"
+  },
+  {
+    "id": "day27-1085",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "speculation",
+    "meaning": "추측\n(speculate, suppose, guess, infer 추측하다)"
+  },
+  {
+    "id": "day27-1086",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "solely",
+    "meaning": "오로지, 혼자서, 전적으로"
+  },
+  {
+    "id": "day27-1087",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "entrepreneur",
+    "meaning": "사업가"
+  },
+  {
+    "id": "day27-1088",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "eventually",
+    "meaning": "결국, 마침내"
+  },
+  {
+    "id": "day27-1089",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "shareholder",
+    "meaning": "주주"
+  },
+  {
+    "id": "day27-1090",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "outlook",
+    "meaning": "전망"
+  },
+  {
+    "id": "day27-1091",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "stability",
+    "meaning": "안정, 안정성"
+  },
+  {
+    "id": "day27-1092",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "bond",
+    "meaning": "채권"
+  },
+  {
+    "id": "day27-1093",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "depreciation",
+    "meaning": "가치 하락, 화폐의 구매력 저하\n(depreciate : ~의 가치를 떨어뜨리다, 가치가 떨어지다)"
+  },
+  {
+    "id": "day27-1094",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "increasing",
+    "meaning": "증가하는"
+  },
+  {
+    "id": "day27-1095",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "prevalent",
+    "meaning": "유행하고 있는, 널리 퍼진\n(prevalence 보급, 유행)"
+  },
+  {
+    "id": "day27-1096",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "rapid",
+    "meaning": "빠른, 신속한"
+  },
+  {
+    "id": "day27-1097",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "unprecedented",
+    "meaning": "전례 없는\n(precedented 전례가 있는)"
+  },
+  {
+    "id": "day27-1098",
+    "day": "day27",
+    "dayNumber": 27,
+    "english": "yield",
+    "meaning": "(이윤을) 가져오다, 산출하다"
+  },
+  {
+    "id": "day28-1099",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "furnished",
+    "meaning": "가구가 비치된"
+  },
+  {
+    "id": "day28-1100",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "residence",
+    "meaning": "거주지, 주택"
+  },
+  {
+    "id": "day28-1101",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "spacious",
+    "meaning": "(공간이)넓은"
+  },
+  {
+    "id": "day28-1102",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "drape",
+    "meaning": "(방 등을 커튼 등으로)장식하다"
+  },
+  {
+    "id": "day28-1103",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "unoccupied",
+    "meaning": "(집 등이)비어 있는, 사람이 살지 않는\n(occupy 차지하다, 점유하다)"
+  },
+  {
+    "id": "day28-1104",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "renovation",
+    "meaning": "수리, 개조"
+  },
+  {
+    "id": "day28-1105",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "appropriate",
+    "meaning": "적당한, 적합한(appropriately 적합하게)"
+  },
+  {
+    "id": "day28-1106",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "delay",
+    "meaning": "연기하다, ~을 뒤로 미루다"
+  },
+  {
+    "id": "day28-1107",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "community",
+    "meaning": "지역 사회, 공동체"
+  },
+  {
+    "id": "day28-1108",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "construction",
+    "meaning": "건설, 건축"
+  },
+  {
+    "id": "day28-1109",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "repair",
+    "meaning": "수리하다"
+  },
+  {
+    "id": "day28-1110",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "currently",
+    "meaning": "현재"
+  },
+  {
+    "id": "day28-1111",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "regularly",
+    "meaning": "정기적으로"
+  },
+  {
+    "id": "day28-1112",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "arrange",
+    "meaning": "배열하다, 정돈하다"
+  },
+  {
+    "id": "day28-1113",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "location",
+    "meaning": "장소, 위치"
+  },
+  {
+    "id": "day28-1114",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "restore",
+    "meaning": "복구하다, 회복시키다\n(recovery 회복, recover되찾다, 회복하다)"
+  },
+  {
+    "id": "day28-1115",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "presently",
+    "meaning": "현재\n(present, current현재의)\n(latest, recent, up to date 최근의)"
+  },
+  {
+    "id": "day28-1116",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "numerous",
+    "meaning": "많은"
+  },
+  {
+    "id": "day28-1117",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "abandon",
+    "meaning": "그만두다; 버리다(abondonment 버림, 포기)"
+  },
+  {
+    "id": "day28-1118",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "contractor",
+    "meaning": "계약자, 도급업자"
+  },
+  {
+    "id": "day28-1119",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "develop",
+    "meaning": "개발하다"
+  },
+  {
+    "id": "day28-1120",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "maintain",
+    "meaning": "유지하다, 관리하다"
+  },
+  {
+    "id": "day28-1121",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "densely",
+    "meaning": "빽빽이, 밀집하여"
+  },
+  {
+    "id": "day28-1122",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "prepare",
+    "meaning": "준비하다, 채비를 갖추다"
+  },
+  {
+    "id": "day28-1123",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "finally",
+    "meaning": "결국, 마침내"
+  },
+  {
+    "id": "day28-1124",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "district",
+    "meaning": "지역, 지구"
+  },
+  {
+    "id": "day28-1125",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "renewal",
+    "meaning": "재개발"
+  },
+  {
+    "id": "day28-1126",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "compulsory",
+    "meaning": "의무적인"
+  },
+  {
+    "id": "day28-1127",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "interfere",
+    "meaning": "방해하다, 해치다"
+  },
+  {
+    "id": "day28-1128",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "relocation",
+    "meaning": "이전, 재배치"
+  },
+  {
+    "id": "day28-1129",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "totally",
+    "meaning": "완전히, 전적으로"
+  },
+  {
+    "id": "day28-1130",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "actually",
+    "meaning": "실제로, 사실은"
+  },
+  {
+    "id": "day28-1131",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "architect",
+    "meaning": "건축가"
+  },
+  {
+    "id": "day28-1132",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "enlarge",
+    "meaning": "확장하다, 확대하다"
+  },
+  {
+    "id": "day28-1133",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "install",
+    "meaning": "설치하다, 장치하다"
+  },
+  {
+    "id": "day28-1134",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "permanent",
+    "meaning": "영구적인"
+  },
+  {
+    "id": "day28-1135",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "suppose",
+    "meaning": "생각하다, 추측하다(guess, infer 추측하다)"
+  },
+  {
+    "id": "day28-1136",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "adjacent",
+    "meaning": "인접한"
+  },
+  {
+    "id": "day28-1137",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "consist",
+    "meaning": "구성되다, 이루어지다"
+  },
+  {
+    "id": "day28-1138",
+    "day": "day28",
+    "dayNumber": 28,
+    "english": "utility",
+    "meaning": "공공시설; 공공요금"
+  },
+  {
+    "id": "day29-1139",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "conserve",
+    "meaning": "보전하다, 유지하다"
+  },
+  {
+    "id": "day29-1140",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "chance",
+    "meaning": "가능성, 기회"
+  },
+  {
+    "id": "day29-1141",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "forecast",
+    "meaning": "(날씨의)예보"
+  },
+  {
+    "id": "day29-1142",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "waste",
+    "meaning": "쓰레기, 폐기물"
+  },
+  {
+    "id": "day29-1143",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "dispose",
+    "meaning": "처분하다, 처리하다"
+  },
+  {
+    "id": "day29-1144",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "recycling",
+    "meaning": "재활용"
+  },
+  {
+    "id": "day29-1145",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "clear",
+    "meaning": "맑게 갠; 명백한, 분명한\n또렷하게, 완전히; 떨어져서"
+  },
+  {
+    "id": "day29-1146",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "damage",
+    "meaning": "피해, 손해, 손상시키다"
+  },
+  {
+    "id": "day29-1147",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "significant",
+    "meaning": "상당한; 중대한, 중요한"
+  },
+  {
+    "id": "day29-1148",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "solution",
+    "meaning": "해결책"
+  },
+  {
+    "id": "day29-1149",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "occur",
+    "meaning": "(일이)발생하다, 생기다(happen, take place)"
+  },
+  {
+    "id": "day29-1150",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "ideal",
+    "meaning": "이상적인"
+  },
+  {
+    "id": "day29-1151",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "preserve",
+    "meaning": "보존하다, 보호하다(=conserve, maintain, retain, keep)"
+  },
+  {
+    "id": "day29-1152",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "aid",
+    "meaning": "원조, 돕다"
+  },
+  {
+    "id": "day29-1153",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "excessive",
+    "meaning": "지나친, 과도한(excess 초과, 초과량)"
+  },
+  {
+    "id": "day29-1154",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "intensively",
+    "meaning": "집중적으로( intense 격렬한)"
+  },
+  {
+    "id": "day29-1155",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "vary",
+    "meaning": "다르다, 다양하다"
+  },
+  {
+    "id": "day29-1156",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "pleasing",
+    "meaning": "즐거운, 기분 좋은, 만족스러운"
+  },
+  {
+    "id": "day29-1157",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "mark",
+    "meaning": "점수, 평점, 표시, 축하하다"
+  },
+  {
+    "id": "day29-1158",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "inaccessible",
+    "meaning": "접근이 불가능한, 이용이 불가능한"
+  },
+  {
+    "id": "day29-1159",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "disturb",
+    "meaning": "방해하다"
+  },
+  {
+    "id": "day29-1160",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "pollutant",
+    "meaning": "오염물질"
+  },
+  {
+    "id": "day29-1161",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "emission",
+    "meaning": "배기가스, 방출"
+  },
+  {
+    "id": "day29-1162",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "dense",
+    "meaning": "빽빽한, 밀집한"
+  },
+  {
+    "id": "day29-1163",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "environmental",
+    "meaning": "환경적인"
+  },
+  {
+    "id": "day29-1164",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "consistent",
+    "meaning": "일치하는, 지속적인, 한결같은"
+  },
+  {
+    "id": "day29-1165",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "leak",
+    "meaning": "누출, 누출량"
+  },
+  {
+    "id": "day29-1166",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "organization",
+    "meaning": "단체"
+  },
+  {
+    "id": "day29-1167",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "continually",
+    "meaning": "계속해서"
+  },
+  {
+    "id": "day29-1168",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "contaminate",
+    "meaning": "오염시키다(=pollution)"
+  },
+  {
+    "id": "day29-1169",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "disaster",
+    "meaning": "재난"
+  },
+  {
+    "id": "day29-1170",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "discharge",
+    "meaning": "방출하다"
+  },
+  {
+    "id": "day29-1171",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "resource",
+    "meaning": "자원, 자료"
+  },
+  {
+    "id": "day29-1172",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "prominent",
+    "meaning": "유명한, 두드러진"
+  },
+  {
+    "id": "day29-1173",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "deplete",
+    "meaning": "고갈시키다(depletion 고갈)"
+  },
+  {
+    "id": "day29-1174",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "purify",
+    "meaning": "정화시키다"
+  },
+  {
+    "id": "day29-1175",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "endangered",
+    "meaning": "멸종 위기에 처한"
+  },
+  {
+    "id": "day29-1176",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "extinction",
+    "meaning": "멸종"
+  },
+  {
+    "id": "day29-1177",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "drought",
+    "meaning": "가뭄"
+  },
+  {
+    "id": "day29-1178",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "inflict",
+    "meaning": "(고통,피해를)입히다, 가하다"
+  },
+  {
+    "id": "day29-1179",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "migration",
+    "meaning": "이동, 이주"
+  },
+  {
+    "id": "day29-1180",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "ecology",
+    "meaning": "생태, 자연환경"
+  },
+  {
+    "id": "day29-1181",
+    "day": "day29",
+    "dayNumber": 29,
+    "english": "habitat",
+    "meaning": "(동, 식물의)서식지"
+  },
+  {
+    "id": "day30-1182",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "fatigue",
+    "meaning": "피로"
+  },
+  {
+    "id": "day30-1183",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "checkup",
+    "meaning": "건강 진단"
+  },
+  {
+    "id": "day30-1184",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "symtom",
+    "meaning": "증상"
+  },
+  {
+    "id": "day30-1185",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "physician",
+    "meaning": "내과의사"
+  },
+  {
+    "id": "day30-1186",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "diagnosis",
+    "meaning": "진단"
+  },
+  {
+    "id": "day30-1187",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "prescribe",
+    "meaning": "(약을)처방하다, 규정하다"
+  },
+  {
+    "id": "day30-1188",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "recovery",
+    "meaning": "회복, 쾌유"
+  },
+  {
+    "id": "day30-1189",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "recognize",
+    "meaning": "인정하다, 알아보다\n(organize 조직하다)"
+  },
+  {
+    "id": "day30-1190",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "join",
+    "meaning": "~에 가입하다"
+  },
+  {
+    "id": "day30-1191",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "comprehensive",
+    "meaning": "종합적인, 포괄적인"
+  },
+  {
+    "id": "day30-1192",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "participate",
+    "meaning": "참여하다, 참가하다"
+  },
+  {
+    "id": "day30-1193",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "recommend",
+    "meaning": "권고하다, 추천하다"
+  },
+  {
+    "id": "day30-1194",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "necessary",
+    "meaning": "필요한"
+  },
+  {
+    "id": "day30-1195",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "ability",
+    "meaning": "능력"
+  },
+  {
+    "id": "day30-1196",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "operation",
+    "meaning": "수술"
+  },
+  {
+    "id": "day30-1197",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "cleanliness",
+    "meaning": "청결"
+  },
+  {
+    "id": "day30-1198",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "duration",
+    "meaning": "지속 기간, 지속"
+  },
+  {
+    "id": "day30-1199",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "examination",
+    "meaning": "진찰, 검사"
+  },
+  {
+    "id": "day30-1200",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "eliminate",
+    "meaning": "제거하다(elimination 제거)"
+  },
+  {
+    "id": "day30-1201",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "easily",
+    "meaning": "쉽게"
+  },
+  {
+    "id": "day30-1202",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "dental",
+    "meaning": "치과의"
+  },
+  {
+    "id": "day30-1203",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "dietary",
+    "meaning": "식이 요법의, 규정식의"
+  },
+  {
+    "id": "day30-1204",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "related",
+    "meaning": "관련된"
+  },
+  {
+    "id": "day30-1205",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "transmit",
+    "meaning": "전염시키다(transmittable 전염가능한, 유전가능한)"
+  },
+  {
+    "id": "day30-1206",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "periodically",
+    "meaning": "주기적으로"
+  },
+  {
+    "id": "day30-1207",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "reaction",
+    "meaning": "반응"
+  },
+  {
+    "id": "day30-1208",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "simple",
+    "meaning": "단순한"
+  },
+  {
+    "id": "day30-1209",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "coverage",
+    "meaning": "(보험의)보상 범위; (신문 등의)보도, 취재범위"
+  },
+  {
+    "id": "day30-1210",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "exposure",
+    "meaning": "노출"
+  },
+  {
+    "id": "day30-1211",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "pharmaceutical",
+    "meaning": "제약의, 약학의"
+  },
+  {
+    "id": "day30-1212",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "premium",
+    "meaning": "보험료"
+  },
+  {
+    "id": "day30-1213",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "relieve",
+    "meaning": "완화시키다"
+  },
+  {
+    "id": "day30-1214",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "combination",
+    "meaning": "결합, 연합"
+  },
+  {
+    "id": "day30-1215",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "conscious",
+    "meaning": "알고 있는, 자각하고 있는\n(consciousness : 의식)"
+  },
+  {
+    "id": "day30-1216",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "deprivation",
+    "meaning": "박탈, 상실(deprivative 박탈하는, 빼앗는)"
+  },
+  {
+    "id": "day30-1217",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "health",
+    "meaning": "건강; (사회,기관의,)번영,안녕"
+  },
+  {
+    "id": "day30-1218",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "induce",
+    "meaning": "유발하다 (reduce줄이다, 낮추다)"
+  },
+  {
+    "id": "day30-1219",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "insurance",
+    "meaning": "보험"
+  },
+  {
+    "id": "day30-1220",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "nutrition",
+    "meaning": "영양"
+  },
+  {
+    "id": "day30-1221",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "prevention",
+    "meaning": "예방(prevent 예방하다, 방해하다)"
+  },
+  {
+    "id": "day30-1222",
+    "day": "day30",
+    "dayNumber": 30,
+    "english": "susceptible",
+    "meaning": "~에 감염되기 쉬운, 영향 받기 쉬운"
+  }
+];
+    const KEY = 'vocab_later_words_v1';
+    const $ = (id) => document.getElementById(id);
+
+    let mode = 'home';
+    let currentWords = [];
+    let index = 0;
+    let flipped = false;
+    let answered = false;
+    let known = 0;
+    let unknown = 0;
+
+    function getLaterIds() {
+      try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
+    }
+    function setLaterIds(ids) {
+      localStorage.setItem(KEY, JSON.stringify([...new Set(ids)]));
+      refreshLaterCount();
+    }
+    function addLater(id) { setLaterIds([...getLaterIds(), id]); }
+    function removeLater(id) { setLaterIds(getLaterIds().filter(x => x !== id)); renderReview(); }
+    function getLaterWords() {
+      const ids = new Set(getLaterIds());
+      return WORDS.filter(w => ids.has(w.id));
+    }
+    function show(name) {
+      ['home','study','review'].forEach(x => $(x).classList.toggle('hidden', x !== name));
+      mode = name;
+      if (name === 'review') renderReview();
+      refreshLaterCount();
+    }
+    function refreshLaterCount() {
+      const n = getLaterIds().length;
+      $('reviewCount').textContent = n;
+      $('laterStat').textContent = n;
+    }
+
+    function renderHome() {
+      const days = [...new Set(WORDS.map(w => w.dayNumber))].sort((a,b)=>a-b);
+      $('totalWords').textContent = WORDS.length;
+      $('totalDays').textContent = days.length;
+      $('dayGrid').innerHTML = days.map(d => `<button class="day-btn" data-day="${d}">Day ${d}<br><span class="muted">${WORDS.filter(w=>w.dayNumber===d).length}개</span></button>`).join('');
+      document.querySelectorAll('[data-day]').forEach(btn => btn.onclick = () => startStudy(WORDS.filter(w => w.dayNumber === Number(btn.dataset.day)), `Day ${btn.dataset.day}`));
+      refreshLaterCount();
+    }
+
+    function startStudy(list, title) {
+      currentWords = [...list];
+      index = 0; flipped = false; answered = false; known = 0; unknown = 0;
+      $('studyTitle').textContent = title + ' 학습';
+      show('study');
+      renderCard();
+    }
+
+    function renderCard() {
+      if (currentWords.length === 0) {
+        $('word').textContent = '단어가 없다';
+        $('meaning').textContent = '';
+        $('meaning').classList.add('hidden');
+        $('hint').textContent = '나중에 볼 단어가 없거나 Day 데이터가 비어있다.';
+        $('progressText').textContent = '';
+        $('knownBtn').disabled = true; $('unknownBtn').disabled = true; $('nextBtn').disabled = true;
+        return;
+      }
+      if (index >= currentWords.length) {
+        $('word').textContent = '끝';
+        $('meaning').textContent = `알았다 ${known}개 / 몰랐다 ${unknown}개`;
+        $('meaning').classList.remove('hidden');
+        $('hint').textContent = '학습이 끝났다.';
+        $('progressText').textContent = `${currentWords.length}개 완료`;
+        $('knownBtn').disabled = true; $('unknownBtn').disabled = true; $('nextBtn').disabled = true;
+        return;
+      }
+      const w = currentWords[index];
+      flipped = false; answered = false;
+      $('word').textContent = w.english;
+      $('meaning').textContent = w.meaning;
+      $('meaning').classList.add('hidden');
+      $('hint').textContent = '카드를 누르면 뜻이 나온다';
+      $('progressText').textContent = `${index + 1} / ${currentWords.length}`;
+      $('knownBtn').disabled = true; $('unknownBtn').disabled = true; $('nextBtn').disabled = true;
+      $('knownCount').textContent = known; $('unknownCount').textContent = unknown;
+      refreshLaterCount();
+    }
+
+    function flipCard() {
+      if (index >= currentWords.length || flipped) return;
+      flipped = true;
+      $('meaning').classList.remove('hidden');
+      $('hint').textContent = '알았다 / 몰랐다를 선택해라';
+      $('knownBtn').disabled = false;
+      $('unknownBtn').disabled = false;
+    }
+    function answer(isKnown) {
+      if (!flipped || answered || index >= currentWords.length) return;
+      answered = true;
+      if (isKnown) known++; else { unknown++; addLater(currentWords[index].id); }
+      $('knownCount').textContent = known; $('unknownCount').textContent = unknown;
+      $('knownBtn').disabled = true; $('unknownBtn').disabled = true; $('nextBtn').disabled = false;
+      $('hint').textContent = isKnown ? '알았다로 처리됨' : '나중에 볼 단어에 저장됨';
+    }
+    function nextWord() { index++; renderCard(); }
+
+    function renderReview() {
+      const list = getLaterWords();
+      $('studyReviewBtn').disabled = list.length === 0;
+      $('reviewList').innerHTML = list.length ? list.map(w => `
+        <div class="item">
+          <div><span class="chip">Day ${w.dayNumber}</span> <span class="eng">${escapeHtml(w.english)}</span><div class="muted" style="margin-top:6px">${escapeHtml(w.meaning)}</div></div>
+          <button data-remove="${w.id}">목록에서 해제</button>
+        </div>`).join('') : '<p class="muted">아직 나중에 볼 단어가 없다.</p>';
+      document.querySelectorAll('[data-remove]').forEach(btn => btn.onclick = () => removeLater(btn.dataset.remove));
+      refreshLaterCount();
+    }
+    function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+    $('homeBtn').onclick = () => show('home');
+    $('reviewBtn').onclick = () => show('review');
+    $('backHomeBtn').onclick = () => show('home');
+    $('card').onclick = flipCard;
+    $('knownBtn').onclick = () => answer(true);
+    $('unknownBtn').onclick = () => answer(false);
+    $('nextBtn').onclick = nextWord;
+    $('studyReviewBtn').onclick = () => startStudy(getLaterWords(), '나중에 볼 단어');
+    $('resetAllBtn').onclick = () => { if (confirm('나중에 볼 단어를 전부 지울까?')) setLaterIds([]); };
+
+    renderHome();
+    show('home');
+  </script>
+</body>
+</html>
